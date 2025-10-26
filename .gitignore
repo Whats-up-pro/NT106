@@ -74,3 +74,8 @@ artifacts/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+## Firebase Credentials (SECURITY)
+**/firebase-credentials.json
+**/Config/firebase-credentials.json
+firebase-adminsdk-*.json

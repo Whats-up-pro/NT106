@@ -11,6 +11,8 @@ namespace MessagingApp.Forms.Main
         private readonly FirebaseAuthService _authService = FirebaseAuthService.Instance;
 
         private Label lblWelcome = null!;
+        private Button btnFriends = null!;
+        private Button btnMessages = null!;
         private Button btnLogout = null!;
         private Button btnToggleTheme = null!;
 
@@ -51,13 +53,39 @@ namespace MessagingApp.Forms.Main
             };
             this.Controls.Add(lblWelcome);
 
+            // Friends button
+            btnFriends = new Button
+            {
+                Text = "👥 Bạn Bè",
+                Width = 180,
+                Height = 60,
+                Location = new Point(50, 120),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnFriends.Click += BtnFriends_Click;
+            this.Controls.Add(btnFriends);
+
+            // Messages button
+            btnMessages = new Button
+            {
+                Text = "💬 Tin Nhắn",
+                Width = 180,
+                Height = 60,
+                Location = new Point(250, 120),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnMessages.Click += BtnMessages_Click;
+            this.Controls.Add(btnMessages);
+
             // Logout button
             btnLogout = new Button
             {
                 Text = "Đăng Xuất",
                 Width = 150,
                 Height = 45,
-                Location = new Point(50, 120),
+                Location = new Point(50, 200),
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
@@ -70,7 +98,7 @@ namespace MessagingApp.Forms.Main
                 Text = "🌙 Chế Độ Tối",
                 Width = 150,
                 Height = 45,
-                Location = new Point(220, 120),
+                Location = new Point(220, 200),
                 Font = new Font("Segoe UI", 11F),
                 Cursor = Cursors.Hand
             };
@@ -83,6 +111,8 @@ namespace MessagingApp.Forms.Main
             this.BackColor = _theme.Background;
             lblWelcome.ForeColor = _theme.TextPrimary;
 
+            _theme.StyleButton(btnFriends, isPrimary: true);
+            _theme.StyleButton(btnMessages, isPrimary: true);
             _theme.StyleButton(btnLogout, isPrimary: false);
             _theme.StyleButton(btnToggleTheme, isPrimary: false);
 
@@ -132,8 +162,22 @@ namespace MessagingApp.Forms.Main
             if (result == DialogResult.Yes)
             {
                 await _authService.SignOut();
+                
+                // Close MainForm, which will show LoginForm again (handled in LoginForm.cs)
                 this.Close();
             }
+        }
+
+        private void BtnFriends_Click(object? sender, EventArgs e)
+        {
+            var friendsForm = new Social.FriendsForm();
+            friendsForm.ShowDialog();
+        }
+
+        private void BtnMessages_Click(object? sender, EventArgs e)
+        {
+            var conversationsForm = new Messaging.ConversationsForm();
+            conversationsForm.ShowDialog();
         }
 
         private void BtnToggleTheme_Click(object? sender, EventArgs e)

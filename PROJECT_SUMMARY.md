@@ -1,14 +1,25 @@
 # Tổng Quan Dự Án - Messaging App
 
-## Thông Tin Dự Án
+> **⚠️ LEGACY DOCUMENTATION - SQL Server Version**  
+> 
+> Đây là tài liệu cho phiên bản cũ với SQL Server.  
+> **Phiên bản mới (Firebase)** xem: [RECONSTRUCTION_SUMMARY.md](RECONSTRUCTION_SUMMARY.md)  
+> **Setup guide**: [Documentation/FIREBASE_SETUP.md](Documentation/FIREBASE_SETUP.md)
+
+---
+
+## Thông Tin Dự Án (Legacy Version)
 - **Tên dự án**: Messaging App - Ứng dụng Nhắn Tin và Gọi Điện
 - **Mã dự án**: NT106
 - **Nhóm phát triển**: 614_2U0C Team
 - **Ngày hoàn thành**: 2025-10-13
-- **Phiên bản**: 1.0.0
+- **Phiên bản**: 1.0.0 (SQL Server - Legacy)
+- **⚠️ Status**: **REPLACED by Firebase version** (see RECONSTRUCTION_SUMMARY.md)
 
 ## Mô Tả Tổng Quan
-Ứng dụng nhắn tin và gọi điện được xây dựng bằng C# Windows Forms với giao diện màu xanh dương đen (#1E3A8A, #2563EB) thân thiện với người dùng. Dự án bao gồm đầy đủ các thành phần từ database, business logic đến giao diện người dùng.
+**[LEGACY]** Ứng dụng nhắn tin và gọi điện được xây dựng bằng C# Windows Forms với giao diện màu xanh dương đen (#1E3A8A, #2563EB) thân thiện với người dùng. Dự án bao gồm đầy đủ các thành phần từ database, business logic đến giao diện người dùng.
+
+**🔥 Đã được reconstruction hoàn toàn với Firebase - Xem RECONSTRUCTION_SUMMARY.md**
 
 ## Các Thành Phần Đã Hoàn Thành
 

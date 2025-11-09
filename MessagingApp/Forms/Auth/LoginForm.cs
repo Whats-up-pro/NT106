@@ -335,7 +335,12 @@ namespace MessagingApp.Forms.Auth
                     // Navigate to main form
                     this.Hide();
                     MainForm mainForm = new MainForm();
-                    mainForm.FormClosed += (s, args) => this.Close();
+                    mainForm.FormClosed += (s, args) => 
+                    {
+                        // When MainForm closes, show LoginForm again instead of closing app
+                        this.Show();
+                        this.txtPassword.Clear(); // Clear password for security
+                    };
                     mainForm.Show();
                 }
                 else

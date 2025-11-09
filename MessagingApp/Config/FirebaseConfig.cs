@@ -18,7 +18,7 @@ namespace MessagingApp.Config
         /// <summary>
         /// Firebase project ID - UPDATE THIS with your Firebase project ID
         /// </summary>
-        public const string ProjectId = "your-firebase-project-id"; // TODO: Replace with actual project ID
+        public const string ProjectId = "nt106-messagingapp"; // TODO: Replace with actual project ID
 
         /// <summary>
         /// Path to Firebase credentials JSON file

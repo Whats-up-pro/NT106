@@ -1,0 +1,2 @@
+dotnet build zaluphake/zaluphake.csproj
+Start-Process "callzaluskbidi\bin\Debug\net8.0-windows\callzaluskbidi.exe" ; Start-Process "zaluphake\bin\Debug\net8.0-windows\zaluphake.exe"

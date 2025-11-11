@@ -10,12 +10,12 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("zaluphake")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("callzaluskbidi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c6be6a233f2b1e6024d193a3aadaca5369009c63")]
-[assembly: System.Reflection.AssemblyProductAttribute("zaluphake")]
-[assembly: System.Reflection.AssemblyTitleAttribute("zaluphake")]
+[assembly: System.Reflection.AssemblyProductAttribute("callzaluskbidi")]
+[assembly: System.Reflection.AssemblyTitleAttribute("callzaluskbidi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]

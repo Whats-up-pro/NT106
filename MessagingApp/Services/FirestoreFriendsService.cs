@@ -86,6 +86,12 @@ namespace MessagingApp.Services
         {
             try
             {
+                // Block sending to self
+                if (fromUserId == toUserId)
+                {
+                    return (false, "Bạn không thể gửi lời mời kết bạn cho chính mình!");
+                }
+
                 // Check if already friends
                 var existingFriendship = await GetFriendship(fromUserId, toUserId);
                 if (existingFriendship != null)
@@ -187,13 +193,30 @@ namespace MessagingApp.Services
             try
             {
                 var requests = new List<Dictionary<string, object>>();
+                Query query;
+                QuerySnapshot snapshot;
 
-                var query = _db.Collection("friendRequests")
-                    .WhereEqualTo("toUserId", userId)
-                    .WhereEqualTo("status", "pending")
-                    .OrderByDescending("createdAt");
+                try
+                {
+                    // Preferred: filter + order by (may require composite index)
+                    query = _db.Collection("friendRequests")
+                        .WhereEqualTo("toUserId", userId)
+                        .WhereEqualTo("status", "pending")
+                        .OrderByDescending("createdAt");
 
-                var snapshot = await query.GetSnapshotAsync();
+                    snapshot = await query.GetSnapshotAsync();
+                }
+                catch (Exception ex)
+                {
+                    // Fallback: if index is missing, try without OrderBy and sort in-memory
+                    Console.WriteLine($"GetPendingRequests primary query failed (likely missing index): {ex.Message}");
+
+                    query = _db.Collection("friendRequests")
+                        .WhereEqualTo("toUserId", userId)
+                        .WhereEqualTo("status", "pending");
+
+                    snapshot = await query.GetSnapshotAsync();
+                }
 
                 foreach (var doc in snapshot.Documents)
                 {
@@ -201,7 +224,14 @@ namespace MessagingApp.Services
                     requestData["requestId"] = doc.Id;
 
                     // Get sender info
-                    string fromUserId = requestData["fromUserId"].ToString()!;
+                    string fromUserId = requestData.ContainsKey("fromUserId") && requestData["fromUserId"] != null
+                        ? requestData["fromUserId"].ToString()!
+                        : string.Empty;
+                    if (string.IsNullOrEmpty(fromUserId))
+                    {
+                        // Skip malformed document
+                        continue;
+                    }
                     var userDoc = await _db.Collection("users").Document(fromUserId).GetSnapshotAsync();
                     
                     if (userDoc.Exists)
@@ -213,6 +243,17 @@ namespace MessagingApp.Services
 
                     requests.Add(requestData);
                 }
+
+                // Ensure newest first if we fell back without OrderBy
+                try
+                {
+                    requests = requests
+                        .OrderByDescending(r => r.ContainsKey("createdAt") && r["createdAt"] is Timestamp
+                            ? ((Timestamp)r["createdAt"]).ToDateTime()
+                            : DateTime.MinValue)
+                        .ToList();
+                }
+                catch { }
 
                 return requests;
             }
@@ -230,21 +271,60 @@ namespace MessagingApp.Services
         {
             try
             {
-                // Update request status
-                await _db.Collection("friendRequests").Document(requestId).UpdateAsync(new Dictionary<string, object>
+                // Use transaction to avoid duplicates and ensure atomicity
+                await _db.RunTransactionAsync(async transaction =>
                 {
-                    { "status", "accepted" },
-                    { "acceptedAt", FieldValue.ServerTimestamp }
+                    // 1) Load the request document
+                    var requestRef = _db.Collection("friendRequests").Document(requestId);
+                    var requestSnap = await transaction.GetSnapshotAsync(requestRef);
+
+                    if (!requestSnap.Exists)
+                    {
+                        throw new InvalidOperationException("Lời mời không tồn tại hoặc đã bị xóa.");
+                    }
+
+                    string status = requestSnap.ContainsField("status") ? requestSnap.GetValue<string>("status") : "";
+                    string reqFrom = requestSnap.ContainsField("fromUserId") ? requestSnap.GetValue<string>("fromUserId") : "";
+                    string reqTo = requestSnap.ContainsField("toUserId") ? requestSnap.GetValue<string>("toUserId") : "";
+
+                    if (!string.Equals(status, "pending", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Idempotent: if already accepted, just return success
+                        if (string.Equals(status, "accepted", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return; // no-op
+                        }
+                        throw new InvalidOperationException("Lời mời không còn ở trạng thái chờ.");
+                    }
+
+                    // Validate participants match parameters
+                    if (reqFrom != fromUserId || reqTo != toUserId)
+                    {
+                        throw new InvalidOperationException("Thông tin lời mời không khớp.");
+                    }
+
+                    // 2) Create or ensure friendship using deterministic document ID
+                    string friendshipId = GetCanonicalPairId(fromUserId, toUserId);
+                    var friendshipRef = _db.Collection("friendships").Document(friendshipId);
+
+                    var friendshipSnap = await transaction.GetSnapshotAsync(friendshipRef);
+                    if (!friendshipSnap.Exists)
+                    {
+                        var friendshipDataTx = new Dictionary<string, object>
+                        {
+                            { "users", new List<string> { fromUserId, toUserId } },
+                            { "createdAt", FieldValue.ServerTimestamp }
+                        };
+                        transaction.Set(friendshipRef, friendshipDataTx);
+                    }
+
+                    // 3) Update request status -> accepted
+                    transaction.Update(requestRef, new Dictionary<string, object>
+                    {
+                        { "status", "accepted" },
+                        { "acceptedAt", FieldValue.ServerTimestamp }
+                    });
                 });
-
-                // Create friendship
-                var friendshipData = new Dictionary<string, object>
-                {
-                    { "users", new List<string> { fromUserId, toUserId } },
-                    { "createdAt", FieldValue.ServerTimestamp }
-                };
-
-                await _db.Collection("friendships").AddAsync(friendshipData);
 
                 return (true, "Đã chấp nhận lời mời kết bạn!");
             }
@@ -252,6 +332,56 @@ namespace MessagingApp.Services
             {
                 return (false, $"Lỗi: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Listen to pending friend requests for a user in real-time
+        /// </summary>
+        public FirestoreChangeListener ListenToPendingRequests(string userId, Action onChanged)
+        {
+            // Prefer index; if missing, Firestore SDK will give an index error. In that case
+            // consider removing OrderBy and triggering a manual refresh in the UI callback.
+            var query = _db.Collection("friendRequests")
+                .WhereEqualTo("toUserId", userId)
+                .WhereEqualTo("status", "pending")
+                .OrderByDescending("createdAt");
+
+            return query.Listen(_ =>
+            {
+                try
+                {
+                    onChanged();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in pending requests listener callback: {ex.Message}");
+                }
+            });
+        }
+
+        private static string GetCanonicalPairId(string userId1, string userId2)
+        {
+            if (string.CompareOrdinal(userId1, userId2) < 0)
+                return $"{userId1}_{userId2}";
+            return $"{userId2}_{userId1}";
+        }
+
+        /// <summary>
+        /// Listen to friendships for a user (real-time)
+        /// </summary>
+        public FirestoreChangeListener ListenToFriendships(string userId, Action onChanged)
+        {
+            var query = _db.Collection("friendships")
+                .WhereArrayContains("users", userId);
+
+            return query.Listen(_ =>
+            {
+                try { onChanged(); }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in friendships listener callback: {ex.Message}");
+                }
+            });
         }
 
         /// <summary>
@@ -292,9 +422,12 @@ namespace MessagingApp.Services
                 foreach (var doc in snapshot.Documents)
                 {
                     var users = doc.GetValue<List<object>>("users");
-                    
-                    // Get the other user's ID
-                    string friendId = users.First(u => u.ToString() != userId).ToString()!;
+
+                    // Defensive: find the other user id safely
+                    var other = users.FirstOrDefault(u => (u?.ToString() ?? string.Empty) != userId);
+                    if (other == null) continue;
+
+                    string friendId = other.ToString()!;
 
                     // Get friend's info
                     var friendDoc = await _db.Collection("users").Document(friendId).GetSnapshotAsync();

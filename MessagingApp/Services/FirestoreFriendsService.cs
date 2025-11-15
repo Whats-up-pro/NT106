@@ -172,7 +172,18 @@ namespace MessagingApp.Services
 
                 foreach (var doc in query.Documents)
                 {
-                    var users = doc.GetValue<List<object>>("users");
+                    List<string>? users = null;
+                    try
+                    {
+                        users = doc.GetValue<List<string>>("users");
+                    }
+                    catch
+                    {
+                        // Fallback for older documents stored with mixed types
+                        var raw = doc.GetValue<IList<object>>("users");
+                        users = raw?.Select(u => u?.ToString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToList() ?? new List<string>();
+                    }
+
                     if (users.Contains(userId2))
                         return doc;
                 }
@@ -421,21 +432,33 @@ namespace MessagingApp.Services
 
                 foreach (var doc in snapshot.Documents)
                 {
-                    var users = doc.GetValue<List<object>>("users");
+                    List<string>? users = null;
+                    try
+                    {
+                        users = doc.GetValue<List<string>>("users");
+                    }
+                    catch
+                    {
+                        // Fallback for older documents stored with mixed types
+                        var raw = doc.GetValue<IList<object>>("users");
+                        users = raw?.Select(u => u?.ToString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToList() ?? new List<string>();
+                    }
+
+                    if (users == null || users.Count != 2)
+                        continue;
 
                     // Defensive: find the other user id safely
-                    var other = users.FirstOrDefault(u => (u?.ToString() ?? string.Empty) != userId);
-                    if (other == null) continue;
-
-                    string friendId = other.ToString()!;
+                    var otherId = users.FirstOrDefault(u => u != userId);
+                    if (string.IsNullOrEmpty(otherId))
+                        continue;
 
                     // Get friend's info
-                    var friendDoc = await _db.Collection("users").Document(friendId).GetSnapshotAsync();
+                    var friendDoc = await _db.Collection("users").Document(otherId).GetSnapshotAsync();
                     
                     if (friendDoc.Exists)
                     {
                         var friendData = friendDoc.ToDictionary();
-                        friendData["userId"] = friendId;
+                        friendData["userId"] = otherId;
                         friendData["friendshipId"] = doc.Id;
                         friends.Add(friendData);
                     }

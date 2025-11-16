@@ -312,5 +312,44 @@ namespace MessagingApp.Services
         {
             return CurrentUserId != null;
         }
+
+        /// <summary>
+        /// Update basic profile fields for current user (bio and avatar local path)
+        /// Note: avatarUrl here is stored as a local file path for demo purposes; uploading to Cloud Storage is out of scope.
+        /// </summary>
+        public async Task<(bool success, string message)> UpdateUserProfile(string? bio, string? avatarLocalPath)
+        {
+            if (CurrentUserId == null)
+            {
+                return (false, "Chưa đăng nhập.");
+            }
+
+            try
+            {
+                var updates = new Dictionary<string, object>();
+                if (bio != null) updates["bio"] = bio;
+                if (!string.IsNullOrWhiteSpace(avatarLocalPath)) updates["avatarUrl"] = avatarLocalPath!;
+
+                if (updates.Count == 0)
+                    return (true, "Không có thay đổi.");
+
+                await _db.Collection("users").Document(CurrentUserId).UpdateAsync(updates);
+
+                // Update cache
+                if (CurrentUserData != null)
+                {
+                    foreach (var kv in updates)
+                    {
+                        CurrentUserData[kv.Key] = kv.Value;
+                    }
+                }
+
+                return (true, "Đã lưu hồ sơ.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi khi cập nhật hồ sơ: {ex.Message}");
+            }
+        }
     }
 }

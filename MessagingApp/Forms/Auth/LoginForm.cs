@@ -209,18 +209,18 @@ namespace MessagingApp.Forms.Auth
             // Register link
             Label lblNoAccount = new Label
             {
-                Text = "Chưa có tài khoản?",
+                Text = "Chưa có tài khoản?   ",
                 AutoSize = true,
-                Location = new Point(220, yPos),
+                Location = new Point(180, yPos),
                 Font = new Font("Segoe UI", 9.5F)
             };
             pnlLoginCard.Controls.Add(lblNoAccount);
 
             lnkRegister = new LinkLabel
             {
-                Text = "Đăng ký ngay",
+                Text = "Đăng ký",
                 AutoSize = true,
-                Location = new Point(220 + lblNoAccount.Width + 5, yPos),
+                Location = new Point(180 + 160, yPos),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
             };
             lnkRegister.LinkClicked += LnkRegister_LinkClicked;

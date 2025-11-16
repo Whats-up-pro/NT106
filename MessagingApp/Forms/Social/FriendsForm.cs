@@ -63,14 +63,14 @@ namespace MessagingApp.Forms.Social
                 Padding = new Padding(20)
             };
             this.Controls.Add(pnlMain);
+            pnlMain.SuspendLayout();
 
-            // Header panel
+            // Header panel (create first, add later to ensure proper docking order)
             pnlHeader = new Panel
             {
                 Height = 120,
                 Dock = DockStyle.Top
             };
-            pnlMain.Controls.Add(pnlHeader);
 
             // Title
             lblTitle = new Label
@@ -133,7 +133,7 @@ namespace MessagingApp.Forms.Social
             btnRequests.Click += BtnRequests_Click;
             pnlHeader.Controls.Add(btnRequests);
 
-            // ListView for friends
+            // ListView for friends (add BEFORE header so header docks properly on top)
             listViewFriends = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -149,6 +149,9 @@ namespace MessagingApp.Forms.Social
             listViewFriends.DoubleClick += ListViewFriends_DoubleClick;
             listViewFriends.MouseClick += ListViewFriends_MouseClick;
             pnlMain.Controls.Add(listViewFriends);
+
+            // Now add header so Dock=Top is applied before Fill area is calculated
+            pnlMain.Controls.Add(pnlHeader);
 
             // Loading label
             lblLoading = new Label
@@ -176,6 +179,8 @@ namespace MessagingApp.Forms.Social
             };
             pnlMain.Controls.Add(lblNoFriends);
             lblNoFriends.BringToFront();
+
+            pnlMain.ResumeLayout(false);
         }
 
         private void ApplyTheme()

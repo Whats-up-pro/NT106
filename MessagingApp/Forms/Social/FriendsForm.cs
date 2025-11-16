@@ -25,6 +25,7 @@ namespace MessagingApp.Forms.Social
         private Label lblNoFriends = null!;
 
         private List<Dictionary<string, object>> _currentFriends = new();
+    private Google.Cloud.Firestore.FirestoreChangeListener? _friendsListener;
 
         public FriendsForm()
         {
@@ -32,6 +33,8 @@ namespace MessagingApp.Forms.Social
             InitializeCustomUI();
             ApplyTheme();
             LoadFriends();
+
+            StartFriendsRealtimeListener();
 
             _theme.OnThemeChanged += OnThemeChanged;
         }
@@ -351,7 +354,8 @@ namespace MessagingApp.Forms.Social
             if (listViewFriends.SelectedItems.Count == 0) return;
 
             var selectedItem = listViewFriends.SelectedItems[0];
-            var friendData = (Dictionary<string, object>)selectedItem.Tag;
+            if (selectedItem.Tag is not Dictionary<string, object> friendData)
+                return;
             string friendId = friendData["userId"].ToString()!;
             string? currentUserId = _authService.CurrentUserId;
 
@@ -378,7 +382,8 @@ namespace MessagingApp.Forms.Social
             if (e.Button == MouseButtons.Right && listViewFriends.SelectedItems.Count > 0)
             {
                 var selectedItem = listViewFriends.SelectedItems[0];
-                var friendData = (Dictionary<string, object>)selectedItem.Tag;
+                if (selectedItem.Tag is not Dictionary<string, object> friendData)
+                    return;
 
                 var contextMenu = new ContextMenuStrip();
 
@@ -420,8 +425,27 @@ namespace MessagingApp.Forms.Social
             if (disposing)
             {
                 _theme.OnThemeChanged -= OnThemeChanged;
+                try { _friendsListener?.StopAsync(); } catch { }
             }
             base.Dispose(disposing);
+        }
+
+        private void StartFriendsRealtimeListener()
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (currentUserId == null) return;
+
+            _friendsListener = _friendsService.ListenToFriendships(currentUserId, () =>
+            {
+                if (this.IsHandleCreated && this.InvokeRequired)
+                {
+                    try { this.BeginInvoke(new Action(() => { LoadFriends(); })); } catch { }
+                }
+                else
+                {
+                    LoadFriends();
+                }
+            });
         }
     }
 }

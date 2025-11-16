@@ -15,6 +15,7 @@ namespace MessagingApp.Forms.Main
         private Button btnMessages = null!;
         private Button btnLogout = null!;
         private Button btnToggleTheme = null!;
+    private Button btnProfile = null!;
 
         public MainForm()
         {
@@ -92,13 +93,26 @@ namespace MessagingApp.Forms.Main
             btnLogout.Click += BtnLogout_Click;
             this.Controls.Add(btnLogout);
 
+            // Profile button
+            btnProfile = new Button
+            {
+                Text = "🧑 Hồ Sơ",
+                Width = 150,
+                Height = 45,
+                Location = new Point(220, 200),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnProfile.Click += BtnProfile_Click;
+            this.Controls.Add(btnProfile);
+
             // Toggle theme button
             btnToggleTheme = new Button
             {
                 Text = "🌙 Chế Độ Tối",
                 Width = 150,
                 Height = 45,
-                Location = new Point(220, 200),
+                Location = new Point(390, 200),
                 Font = new Font("Segoe UI", 11F),
                 Cursor = Cursors.Hand
             };
@@ -114,6 +128,7 @@ namespace MessagingApp.Forms.Main
             _theme.StyleButton(btnFriends, isPrimary: true);
             _theme.StyleButton(btnMessages, isPrimary: true);
             _theme.StyleButton(btnLogout, isPrimary: false);
+            _theme.StyleButton(btnProfile, isPrimary: false);
             _theme.StyleButton(btnToggleTheme, isPrimary: false);
 
             // Update theme button text
@@ -178,6 +193,12 @@ namespace MessagingApp.Forms.Main
         {
             var conversationsForm = new Messaging.ConversationsForm();
             conversationsForm.ShowDialog();
+        }
+
+        private void BtnProfile_Click(object? sender, EventArgs e)
+        {
+            var profileForm = new Social.ProfileForm();
+            profileForm.ShowDialog();
         }
 
         private void BtnToggleTheme_Click(object? sender, EventArgs e)

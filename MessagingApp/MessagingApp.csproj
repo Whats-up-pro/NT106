@@ -13,8 +13,14 @@
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
     <PackageReference Include="FirebaseAdmin" Version="3.0.0" />
     <PackageReference Include="Google.Cloud.Firestore" Version="3.7.0" />
+    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.9.0" />
     <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- Link code from ../sendfile folder into this project -->
+  <ItemGroup>
+    <Compile Include="..\sendfile\FileTransferService.cs" Link="Features\FileTransfer\FileTransferService.cs" />
   </ItemGroup>
 
 </Project>

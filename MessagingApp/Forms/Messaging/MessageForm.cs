@@ -23,6 +23,7 @@ namespace MessagingApp.Forms.Messaging
         private RichTextBox rtbMessages = null!;
         private TextBox txtMessage = null!;
         private Button btnSend = null!;
+        private Button btnSendFile = null!;
 
         public MessageForm(string conversationId, Dictionary<string, object> friendData)
         {
@@ -113,7 +114,7 @@ namespace MessagingApp.Forms.Messaging
             // Message textbox
             txtMessage = new TextBox
             {
-                Width = 630,
+                Width = 520,
                 Height = 40,
                 Location = new Point(0, 5),
                 Font = new Font("Segoe UI", 11F),
@@ -122,6 +123,19 @@ namespace MessagingApp.Forms.Messaging
             };
             txtMessage.KeyPress += TxtMessage_KeyPress;
             pnlInput.Controls.Add(txtMessage);
+
+            // Send file button
+            btnSendFile = new Button
+            {
+                Text = "📎 Tệp",
+                Width = 100,
+                Height = 40,
+                Location = new Point(530, 5),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnSendFile.Click += BtnSendFile_Click;
+            pnlInput.Controls.Add(btnSendFile);
 
             // Send button
             btnSend = new Button
@@ -152,6 +166,7 @@ namespace MessagingApp.Forms.Messaging
 
             _theme.StyleTextBox(txtMessage);
             _theme.StyleButton(btnSend, isPrimary: true);
+            _theme.StyleButton(btnSendFile, isPrimary: false);
         }
 
         private void OnThemeChanged(ThemeService.ThemeMode newTheme)
@@ -204,6 +219,11 @@ namespace MessagingApp.Forms.Messaging
             {
                 string senderId = msg["senderId"].ToString()!;
                 string content = msg["content"].ToString()!;
+                string messageType = msg.ContainsKey("messageType") ? msg["messageType"].ToString()! : "text";
+                if (messageType == "file")
+                {
+                    content = "📎 " + (msg.ContainsKey("fileName") ? msg["fileName"].ToString()! : content);
+                }
                 bool isCurrentUser = senderId == currentUserId;
 
                 // Format timestamp
@@ -247,6 +267,71 @@ namespace MessagingApp.Forms.Messaging
             // Scroll to bottom
             rtbMessages.SelectionStart = rtbMessages.Text.Length;
             rtbMessages.ScrollToCaret();
+        }
+
+        private async void BtnSendFile_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                string? currentUserId = _authService.CurrentUserId;
+                if (currentUserId == null)
+                {
+                    MessageBox.Show("Vui lòng đăng nhập lại!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                using var ofd = new OpenFileDialog
+                {
+                    Title = "Chọn tệp để gửi",
+                    Filter = "All files (*.*)|*.*",
+                    Multiselect = false
+                };
+
+                if (ofd.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+
+                btnSend.Enabled = false;
+                btnSendFile.Enabled = false;
+                txtMessage.Enabled = false;
+
+                var fileService = FileTransferService.Instance;
+                var uploadResult = await fileService.UploadFileAsync(currentUserId, ofd.FileName);
+
+                if (!uploadResult.success || uploadResult.publicUrl == null)
+                {
+                    MessageBox.Show(uploadResult.message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    var fileInfo = new System.IO.FileInfo(ofd.FileName);
+                    var (success, message) = await _messagingService.SendFileMessage(
+                        _conversationId,
+                        currentUserId,
+                        fileInfo.Name,
+                        uploadResult.publicUrl,
+                        fileInfo.Length,
+                        "application/octet-stream"
+                    );
+
+                    if (!success)
+                    {
+                        MessageBox.Show(message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+
+                btnSend.Enabled = true;
+                btnSendFile.Enabled = true;
+                txtMessage.Enabled = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi gửi tệp: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                btnSend.Enabled = true;
+                btnSendFile.Enabled = true;
+                txtMessage.Enabled = true;
+            }
         }
 
         private void TxtMessage_KeyPress(object? sender, KeyPressEventArgs e)

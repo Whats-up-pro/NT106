@@ -142,6 +142,44 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
+        /// Send a file message (after file uploaded to Storage)
+        /// </summary>
+        public async Task<(bool success, string message)> SendFileMessage(string conversationId, string senderId, string fileName, string fileUrl, long fileSize, string contentType)
+        {
+            try
+            {
+                var displayText = $"[Tệp] {fileName}";
+                var messageData = new Dictionary<string, object>
+                {
+                    { "conversationId", conversationId },
+                    { "senderId", senderId },
+                    { "content", displayText },
+                    { "timestamp", FieldValue.ServerTimestamp },
+                    { "read", false },
+                    { "messageType", "file" },
+                    { "fileName", fileName },
+                    { "fileUrl", fileUrl },
+                    { "fileSize", fileSize },
+                    { "contentType", contentType }
+                };
+
+                await _db.Collection("messages").AddAsync(messageData);
+
+                await _db.Collection("conversations").Document(conversationId).UpdateAsync(new Dictionary<string, object>
+                {
+                    { "lastMessage", displayText },
+                    { "lastMessageAt", FieldValue.ServerTimestamp }
+                });
+
+                return (true, "Tệp đã được gửi!");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi gửi tệp: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Get messages in a conversation
         /// </summary>
         public async Task<List<Dictionary<string, object>>> GetMessages(string conversationId, int limit = 50)

@@ -1,4 +1,5 @@
 using MessagingApp.Services;
+using Google.Cloud.Firestore;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -25,6 +26,7 @@ namespace MessagingApp.Forms.Social
         private Label lblNoFriends = null!;
 
         private List<Dictionary<string, object>> _currentFriends = new();
+    private Google.Cloud.Firestore.FirestoreChangeListener? _friendsListener;
 
         public FriendsForm()
         {
@@ -32,6 +34,8 @@ namespace MessagingApp.Forms.Social
             InitializeCustomUI();
             ApplyTheme();
             LoadFriends();
+
+            StartFriendsRealtimeListener();
 
             _theme.OnThemeChanged += OnThemeChanged;
         }
@@ -59,14 +63,14 @@ namespace MessagingApp.Forms.Social
                 Padding = new Padding(20)
             };
             this.Controls.Add(pnlMain);
+            pnlMain.SuspendLayout();
 
-            // Header panel
+            // Header panel (create first, add later to ensure proper docking order)
             pnlHeader = new Panel
             {
                 Height = 120,
                 Dock = DockStyle.Top
             };
-            pnlMain.Controls.Add(pnlHeader);
 
             // Title
             lblTitle = new Label
@@ -129,7 +133,7 @@ namespace MessagingApp.Forms.Social
             btnRequests.Click += BtnRequests_Click;
             pnlHeader.Controls.Add(btnRequests);
 
-            // ListView for friends
+            // ListView for friends (add BEFORE header so header docks properly on top)
             listViewFriends = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -145,6 +149,9 @@ namespace MessagingApp.Forms.Social
             listViewFriends.DoubleClick += ListViewFriends_DoubleClick;
             listViewFriends.MouseClick += ListViewFriends_MouseClick;
             pnlMain.Controls.Add(listViewFriends);
+
+            // Now add header so Dock=Top is applied before Fill area is calculated
+            pnlMain.Controls.Add(pnlHeader);
 
             // Loading label
             lblLoading = new Label
@@ -172,6 +179,8 @@ namespace MessagingApp.Forms.Social
             };
             pnlMain.Controls.Add(lblNoFriends);
             lblNoFriends.BringToFront();
+
+            pnlMain.ResumeLayout(false);
         }
 
         private void ApplyTheme()
@@ -217,6 +226,46 @@ namespace MessagingApp.Forms.Social
 
                 _currentFriends = await _friendsService.GetFriends(currentUserId);
 
+                // Compute reliable online status with staleness window and sort online first
+                const int OnlineStaleMinutes = 10; // consider online only if active within 10 minutes
+                foreach (var f in _currentFriends)
+                {
+                    bool isOnline = false;
+                    try
+                    {
+                        string status = f.ContainsKey("status") && f["status"] != null
+                            ? f["status"].ToString()!.ToLower()
+                            : string.Empty;
+
+                        if (status == "online")
+                        {
+                            if (f.ContainsKey("lastLogin") && f["lastLogin"] is Timestamp ts)
+                            {
+                                var age = DateTime.UtcNow - ts.ToDateTime();
+                                isOnline = age < TimeSpan.FromMinutes(OnlineStaleMinutes);
+                            }
+                            else
+                            {
+                                // If no timestamp, fall back to status flag
+                                isOnline = true;
+                            }
+                        }
+                    }
+                    catch { }
+
+                    f["isOnline"] = isOnline;
+                }
+
+                _currentFriends = _currentFriends
+                    .OrderByDescending(f => f.ContainsKey("isOnline") && f["isOnline"] is bool b && b)
+                    .ThenBy(f =>
+                    {
+                        string fullName = f.ContainsKey("fullName") && f["fullName"] != null ? f["fullName"].ToString()! : string.Empty;
+                        string username = f.ContainsKey("username") && f["username"] != null ? f["username"].ToString()! : string.Empty;
+                        return string.IsNullOrEmpty(fullName) ? username : fullName;
+                    })
+                    .ToList();
+
                 lblLoading.Visible = false;
 
                 if (_currentFriends.Count == 0)
@@ -229,11 +278,11 @@ namespace MessagingApp.Forms.Social
                 {
                     string fullName = friend.ContainsKey("fullName") ? friend["fullName"].ToString()! : "";
                     string username = friend.ContainsKey("username") ? friend["username"].ToString()! : "";
-                    string status = friend.ContainsKey("status") ? friend["status"].ToString()! : "offline";
+                    bool isOnline = friend.ContainsKey("isOnline") && friend["isOnline"] is bool b && b;
                     string email = friend.ContainsKey("email") ? friend["email"].ToString()! : "";
 
                     string displayName = string.IsNullOrEmpty(fullName) ? username : fullName;
-                    string statusText = status == "online" ? "🟢 Online" : "⚫ Offline";
+                    string statusText = isOnline ? "🟢 Online" : "⚫ Offline";
 
                     var item = new ListViewItem(displayName);
                     item.SubItems.Add(username);
@@ -242,7 +291,7 @@ namespace MessagingApp.Forms.Social
                     item.Tag = friend;
 
                     // Color based on status
-                    if (status == "online")
+                    if (isOnline)
                     {
                         item.ForeColor = _theme.Success;
                     }
@@ -307,15 +356,26 @@ namespace MessagingApp.Forms.Social
                 return fullName.Contains(searchText) || username.Contains(searchText) || email.Contains(searchText);
             });
 
-            foreach (var friend in filtered)
+            // Keep sorting: online first, then by display name
+            var sortedFiltered = filtered
+                .OrderByDescending(f => f.ContainsKey("isOnline") && f["isOnline"] is bool b && b)
+                .ThenBy(f =>
+                {
+                    string fullName = f.ContainsKey("fullName") && f["fullName"] != null ? f["fullName"].ToString()! : string.Empty;
+                    string username = f.ContainsKey("username") && f["username"] != null ? f["username"].ToString()! : string.Empty;
+                    return string.IsNullOrEmpty(fullName) ? username : fullName;
+                })
+                .ToList();
+
+            foreach (var friend in sortedFiltered)
             {
                 string fullName = friend.ContainsKey("fullName") ? friend["fullName"].ToString()! : "";
                 string username = friend.ContainsKey("username") ? friend["username"].ToString()! : "";
-                string status = friend.ContainsKey("status") ? friend["status"].ToString()! : "offline";
+                bool isOnline = friend.ContainsKey("isOnline") && friend["isOnline"] is bool b && b;
                 string email = friend.ContainsKey("email") ? friend["email"].ToString()! : "";
 
                 string displayName = string.IsNullOrEmpty(fullName) ? username : fullName;
-                string statusText = status == "online" ? "🟢 Online" : "⚫ Offline";
+                string statusText = isOnline ? "🟢 Online" : "⚫ Offline";
 
                 var item = new ListViewItem(displayName);
                 item.SubItems.Add(username);
@@ -323,7 +383,7 @@ namespace MessagingApp.Forms.Social
                 item.SubItems.Add(email);
                 item.Tag = friend;
 
-                if (status == "online")
+                if (isOnline)
                 {
                     item.ForeColor = _theme.Success;
                 }
@@ -351,7 +411,8 @@ namespace MessagingApp.Forms.Social
             if (listViewFriends.SelectedItems.Count == 0) return;
 
             var selectedItem = listViewFriends.SelectedItems[0];
-            var friendData = (Dictionary<string, object>)selectedItem.Tag;
+            if (selectedItem.Tag is not Dictionary<string, object> friendData)
+                return;
             string friendId = friendData["userId"].ToString()!;
             string? currentUserId = _authService.CurrentUserId;
 
@@ -378,7 +439,8 @@ namespace MessagingApp.Forms.Social
             if (e.Button == MouseButtons.Right && listViewFriends.SelectedItems.Count > 0)
             {
                 var selectedItem = listViewFriends.SelectedItems[0];
-                var friendData = (Dictionary<string, object>)selectedItem.Tag;
+                if (selectedItem.Tag is not Dictionary<string, object> friendData)
+                    return;
 
                 var contextMenu = new ContextMenuStrip();
 
@@ -420,8 +482,27 @@ namespace MessagingApp.Forms.Social
             if (disposing)
             {
                 _theme.OnThemeChanged -= OnThemeChanged;
+                try { _friendsListener?.StopAsync(); } catch { }
             }
             base.Dispose(disposing);
+        }
+
+        private void StartFriendsRealtimeListener()
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (currentUserId == null) return;
+
+            _friendsListener = _friendsService.ListenToFriendships(currentUserId, () =>
+            {
+                if (this.IsHandleCreated && this.InvokeRequired)
+                {
+                    try { this.BeginInvoke(new Action(() => { LoadFriends(); })); } catch { }
+                }
+                else
+                {
+                    LoadFriends();
+                }
+            });
         }
     }
 }

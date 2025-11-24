@@ -17,13 +17,17 @@ namespace MessagingApp.Forms.Social
         private ListView listViewRequests = null!;
         private Label lblLoading = null!;
         private Label lblNoRequests = null!;
+        private Google.Cloud.Firestore.FirestoreChangeListener? _requestsListener;
+        private bool _infoShown = false;
 
         public FriendRequestsForm()
         {
             InitializeComponent();
             InitializeCustomUI();
             ApplyTheme();
-            LoadRequests();
+            LoadRequests(showInfo: true);
+
+            StartRealtimeListener();
 
             _theme.OnThemeChanged += OnThemeChanged;
         }
@@ -127,7 +131,7 @@ namespace MessagingApp.Forms.Social
             ApplyTheme();
         }
 
-        private async void LoadRequests()
+        private async void LoadRequests(bool showInfo = false)
         {
             try
             {
@@ -193,8 +197,12 @@ namespace MessagingApp.Forms.Social
                     listViewRequests.Items.Add(item);
                 }
 
-                MessageBox.Show($"Bạn có {requests.Count} lời mời kết bạn.\nRight-click để chấp nhận hoặc từ chối.",
-                    "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (showInfo && !_infoShown)
+                {
+                    _infoShown = true;
+                    MessageBox.Show($"Bạn có {requests.Count} lời mời kết bạn.\nRight-click để chấp nhận hoặc từ chối.",
+                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
             catch (Exception ex)
             {
@@ -204,20 +212,49 @@ namespace MessagingApp.Forms.Social
             }
         }
 
+        private void StartRealtimeListener()
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (currentUserId == null)
+                return;
+
+            // Start listening for pending requests to current user
+            _requestsListener = _friendsService.ListenToPendingRequests(currentUserId, () =>
+            {
+                // Firestore listener callback may be on a non-UI thread
+                if (this.IsHandleCreated && this.InvokeRequired)
+                {
+                    try { this.BeginInvoke(new Action(() => LoadRequests())); } catch { }
+                }
+                else
+                {
+                    LoadRequests();
+                }
+            });
+        }
+
         private void ListViewRequests_MouseClick(object? sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Right && listViewRequests.SelectedItems.Count > 0)
             {
                 var selectedItem = listViewRequests.SelectedItems[0];
-                var requestData = (Dictionary<string, object>)selectedItem.Tag;
+                if (selectedItem.Tag is not Dictionary<string, object> requestData)
+                {
+                    return;
+                }
 
                 var contextMenu = new ContextMenuStrip();
 
                 var acceptItem = new ToolStripMenuItem("✅ Chấp nhận");
                 acceptItem.Click += async (s, args) =>
                 {
-                    string requestId = requestData["requestId"].ToString()!;
-                    string fromUserId = requestData["fromUserId"].ToString()!;
+                    if (!requestData.TryGetValue("requestId", out var reqIdObj) || reqIdObj == null)
+                        return;
+                    if (!requestData.TryGetValue("fromUserId", out var fromObj) || fromObj == null)
+                        return;
+
+                    string requestId = reqIdObj.ToString()!;
+                    string fromUserId = fromObj.ToString()!;
                     string? currentUserId = _authService.CurrentUserId;
 
                     if (currentUserId == null) return;
@@ -237,7 +274,9 @@ namespace MessagingApp.Forms.Social
                 var declineItem = new ToolStripMenuItem("❌ Từ chối");
                 declineItem.Click += async (s, args) =>
                 {
-                    string requestId = requestData["requestId"].ToString()!;
+                    if (!requestData.TryGetValue("requestId", out var reqIdObj) || reqIdObj == null)
+                        return;
+                    string requestId = reqIdObj.ToString()!;
 
                     var result = MessageBox.Show(
                         "Bạn có chắc chắn muốn từ chối lời mời này?",
@@ -270,6 +309,7 @@ namespace MessagingApp.Forms.Social
             if (disposing)
             {
                 _theme.OnThemeChanged -= OnThemeChanged;
+                try { _requestsListener?.StopAsync(); } catch { }
             }
             base.Dispose(disposing);
         }

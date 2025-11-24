@@ -15,7 +15,7 @@ namespace MessagingApp.Forms.Main
         private Button btnMessages = null!;
         private Button btnLogout = null!;
         private Button btnToggleTheme = null!;
-    private Button btnProfile = null!;
+        private Button btnProfile = null!;
 
         public MainForm()
         {
@@ -96,8 +96,8 @@ namespace MessagingApp.Forms.Main
             // Profile button
             btnProfile = new Button
             {
-                Text = "🧑 Hồ Sơ",
-                Width = 150,
+                Text = "👤 Xem trang cá nhân",
+                Width = 180,
                 Height = 45,
                 Location = new Point(220, 200),
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),

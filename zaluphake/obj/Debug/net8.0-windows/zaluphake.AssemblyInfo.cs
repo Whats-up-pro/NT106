@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("zaluphake")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8c5b810c51ca1d3c00a0a6b6d81618d9bbca3a1a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ce72bdcd73dd697a2e4a6263b9b5c58be261fae0")]
 [assembly: System.Reflection.AssemblyProductAttribute("zaluphake")]
 [assembly: System.Reflection.AssemblyTitleAttribute("zaluphake")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

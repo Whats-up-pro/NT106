@@ -17,4 +17,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <!-- Khôi phục: bỏ sao chép file cấu hình phụ (API key / credentials) ở build -->
+
 </Project>

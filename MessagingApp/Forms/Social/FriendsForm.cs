@@ -226,6 +226,17 @@ namespace MessagingApp.Forms.Social
 
                 _currentFriends = await _friendsService.GetFriends(currentUserId);
 
+                // Đảm bảo không trùng userId nếu Firestore còn sót document friendship cũ
+                var seenIds = new HashSet<string>();
+                var deduped = new List<Dictionary<string, object>>();
+                foreach (var f in _currentFriends)
+                {
+                    var uid = f.ContainsKey("userId") ? f["userId"]?.ToString() ?? string.Empty : string.Empty;
+                    if (string.IsNullOrEmpty(uid) || !seenIds.Add(uid)) continue;
+                    deduped.Add(f);
+                }
+                _currentFriends = deduped;
+
                 // Compute reliable online status with staleness window and sort online first
                 const int OnlineStaleMinutes = 10; // consider online only if active within 10 minutes
                 foreach (var f in _currentFriends)

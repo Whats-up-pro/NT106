@@ -23,44 +23,49 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
-        /// Get or create conversation between two users
+        /// Get or create a unique 1-1 conversation between two users using a canonical ID.
+        /// This ensures both sides always join the same conversation and avoids duplicates.
         /// </summary>
         public async Task<string> GetOrCreateConversation(string user1Id, string user2Id)
         {
+            if (string.IsNullOrEmpty(user1Id) || string.IsNullOrEmpty(user2Id))
+                throw new ArgumentException("User ids must not be empty.");
+
             try
             {
-                // Check if conversation exists
-                var query = _db.Collection("conversations")
-                    .WhereArrayContains("participants", user1Id);
+                // Canonical deterministic conversation id (same order for both sides)
+                string conversationId = GetCanonicalPairId(user1Id, user2Id);
+                var convRef = _db.Collection("conversations").Document(conversationId);
+                var snapshot = await convRef.GetSnapshotAsync();
 
-                var snapshot = await query.GetSnapshotAsync();
-
-                foreach (var doc in snapshot.Documents)
+                if (!snapshot.Exists)
                 {
-                    var participants = doc.GetValue<List<object>>("participants");
-                    if (participants.Contains(user2Id))
+                    var participants = new List<string> { user1Id, user2Id };
+                    var conversationData = new Dictionary<string, object>
                     {
-                        return doc.Id;
-                    }
+                        { "participants", participants },
+                        { "createdAt", FieldValue.ServerTimestamp },
+                        { "lastMessageAt", FieldValue.ServerTimestamp },
+                        { "lastMessage", string.Empty }
+                    };
+
+                    await convRef.SetAsync(conversationData, SetOptions.MergeAll);
                 }
 
-                // Create new conversation
-                var conversationData = new Dictionary<string, object>
-                {
-                    { "participants", new List<string> { user1Id, user2Id } },
-                    { "createdAt", FieldValue.ServerTimestamp },
-                    { "lastMessageAt", FieldValue.ServerTimestamp },
-                    { "lastMessage", "" }
-                };
-
-                var newDoc = await _db.Collection("conversations").AddAsync(conversationData);
-                return newDoc.Id;
+                return conversationId;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting/creating conversation: {ex.Message}");
                 throw;
             }
+        }
+
+        private static string GetCanonicalPairId(string userId1, string userId2)
+        {
+            if (string.CompareOrdinal(userId1, userId2) < 0)
+                return $"{userId1}_{userId2}";
+            return $"{userId2}_{userId1}";
         }
 
         /// <summary>
@@ -120,7 +125,7 @@ namespace MessagingApp.Services
                     { "conversationId", conversationId },
                     { "senderId", senderId },
                     { "content", content },
-                    { "timestamp", FieldValue.ServerTimestamp },
+                    { "timestamp", Timestamp.GetCurrentTimestamp() },
                     { "read", false }
                 };
 
@@ -144,7 +149,7 @@ namespace MessagingApp.Services
         /// <summary>
         /// Get messages in a conversation
         /// </summary>
-        public async Task<List<Dictionary<string, object>>> GetMessages(string conversationId, int limit = 50)
+        public async Task<List<Dictionary<string, object>>> GetMessages(string conversationId, int limit = 200)
         {
             try
             {
@@ -152,7 +157,6 @@ namespace MessagingApp.Services
 
                 var query = _db.Collection("messages")
                     .WhereEqualTo("conversationId", conversationId)
-                    .OrderByDescending("timestamp")
                     .Limit(limit);
 
                 var snapshot = await query.GetSnapshotAsync();
@@ -164,13 +168,45 @@ namespace MessagingApp.Services
                     messages.Add(msgData);
                 }
 
-                // Reverse to show oldest first
-                messages.Reverse();
                 return messages;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting messages: {ex.Message}");
+                return new List<Dictionary<string, object>>();
+            }
+        }
+
+        /// <summary>
+        /// Get older messages before a timestamp (for pagination / scroll-back). Returns ascending order.
+        /// Note: This uses an orderBy on timestamp and may require a composite index with conversationId.
+        /// </summary>
+        public async Task<List<Dictionary<string, object>>> GetMessagesBefore(string conversationId, Timestamp before, int limit = 50)
+        {
+            try
+            {
+                var messages = new List<Dictionary<string, object>>();
+
+                var query = _db.Collection("messages")
+                    .WhereEqualTo("conversationId", conversationId)
+                    .WhereLessThan("timestamp", before)
+                    .OrderBy("timestamp")
+                    .Limit(limit);
+
+                var snapshot = await query.GetSnapshotAsync();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    var msgData = doc.ToDictionary();
+                    msgData["messageId"] = doc.Id;
+                    messages.Add(msgData);
+                }
+
+                return messages;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting older messages: {ex.Message}");
                 return new List<Dictionary<string, object>>();
             }
         }
@@ -213,8 +249,7 @@ namespace MessagingApp.Services
         {
             var query = _db.Collection("messages")
                 .WhereEqualTo("conversationId", conversationId)
-                .OrderByDescending("timestamp")
-                .Limit(50);
+                .Limit(200);
 
             return query.Listen(snapshot =>
             {
@@ -227,6 +262,20 @@ namespace MessagingApp.Services
                 }
                 messages.Reverse();
                 onMessagesChanged(messages);
+            });
+        }
+
+        /// <summary>
+        /// Listen to conversation changes for a user (real-time)
+        /// </summary>
+        public FirestoreChangeListener ListenToConversations(string userId, Action onChanged)
+        {
+            var query = _db.Collection("conversations")
+                .WhereArrayContains("participants", userId);
+
+            return query.Listen(_ =>
+            {
+                try { onChanged(); } catch { }
             });
         }
 
@@ -268,6 +317,79 @@ namespace MessagingApp.Services
                 Console.WriteLine($"Error getting unread count: {ex.Message}");
                 return 0;
             }
+        }
+
+        /// <summary>
+        /// Get unread message count for a specific conversation (excluding current user's own messages)
+        /// </summary>
+        public async Task<int> GetUnreadCountForConversation(string conversationId, string userId)
+        {
+            try
+            {
+                var query = _db.Collection("messages")
+                    .WhereEqualTo("conversationId", conversationId)
+                    .WhereEqualTo("read", false);
+
+                var snapshot = await query.GetSnapshotAsync();
+                int count = 0;
+                foreach (var doc in snapshot.Documents)
+                {
+                    string senderId = doc.GetValue<string>("senderId");
+                    if (senderId != userId)
+                    {
+                        count++;
+                    }
+                }
+                return count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting unread count for conversation: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Set typing state for a user within a conversation.
+        /// </summary>
+        public async Task SetTypingAsync(string conversationId, string userId, bool isTyping)
+        {
+            try
+            {
+                var docRef = _db.Collection("conversations").Document(conversationId)
+                    .Collection("typing").Document(userId);
+                await docRef.SetAsync(new Dictionary<string, object>
+                {
+                    { "typing", isTyping },
+                    { "updatedAt", FieldValue.ServerTimestamp }
+                }, SetOptions.MergeAll);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error setting typing state: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Listen to typing state of the other user in a conversation.
+        /// </summary>
+        public FirestoreChangeListener ListenToTyping(string conversationId, string otherUserId, Action<bool> onTypingChanged)
+        {
+            var docRef = _db.Collection("conversations").Document(conversationId)
+                .Collection("typing").Document(otherUserId);
+            return docRef.Listen(snapshot =>
+            {
+                bool isTyping = false;
+                try
+                {
+                    if (snapshot.Exists && snapshot.ContainsField("typing"))
+                    {
+                        isTyping = snapshot.GetValue<bool>("typing");
+                    }
+                }
+                catch { }
+                onTypingChanged(isTyping);
+            });
         }
     }
 }

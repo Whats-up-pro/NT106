@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function: Check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (for search & friends list)
+      allow read: if isAuthenticated();
+      
+      // Users can only write their own profile
+      allow create: if isOwner(userId);
+      allow update, delete: if isOwner(userId);
+    }
+    
+    // Friendships collection
+    // Structure: { users: [userId1, userId2], createdAt: timestamp }
+    match /friendships/{friendshipId} {
+      // Users can read friendships they're part of
+      allow read: if isAuthenticated() && 
+        request.auth.uid in resource.data.users;
+      
+      // Users can create friendships
+      allow create: if isAuthenticated();
+      
+      // Users can delete their own friendships (unfriend)
+      allow delete: if isAuthenticated() && 
+        request.auth.uid in resource.data.users;
+    }
+    
+    // Friend Requests collection
+    // Structure: { fromUserId, toUserId, status, createdAt }
+    match /friendRequests/{requestId} {
+      // Users can read requests they sent or received
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.fromUserId ||
+        request.auth.uid == resource.data.toUserId
+      );
+      
+      // Users can create friend requests (sender)
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.fromUserId;
+      
+      // Only receiver can update (accept/decline)
+      allow update: if isAuthenticated() && 
+        request.auth.uid == resource.data.toUserId;
+      
+      // Sender can delete their own request
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.fromUserId;
+    }
+    
+    // Conversations collection
+    // Structure: { participants: [userId1, userId2], lastMessage, lastMessageAt, createdAt }
+    match /conversations/{conversationId} {
+      // Participants can read the conversation
+      allow read: if isAuthenticated() && 
+        request.auth.uid in resource.data.participants;
+      
+      // Authenticated users can create conversations
+      allow create: if isAuthenticated() && 
+        request.auth.uid in request.resource.data.participants;
+      
+      // Participants can update the conversation (lastMessage)
+      allow update: if isAuthenticated() && 
+        request.auth.uid in resource.data.participants;
+      
+      // No one can delete conversations (keep history)
+      allow delete: if false;
+    }
+    
+    // Messages collection (top-level, not subcollection)
+    // Structure: { conversationId, senderId, content, timestamp, read }
+    match /messages/{messageId} {
+      // Users can read messages from their conversations
+      allow read: if isAuthenticated();
+      
+      // Users can create messages
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.senderId;
+      
+      // Users can update read status
+      allow update: if isAuthenticated();
+      
+      // Senders can delete their messages
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.senderId;
+    }
+    
+    // Call history collection (optional - for future)
+    match /callHistory/{callId} {
+      // Participants can read call history
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId
+      );
+      
+      // Authenticated users can create call records
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.callerId;
+      
+      // Participants can update call records (duration, status)
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.callerId ||
+        request.auth.uid == resource.data.receiverId
+      );
+      
+      // No one can delete call history
+      allow delete: if false;
+    }
+  }
+}

@@ -109,7 +109,8 @@ namespace MessagingApp.Services
                     { "createdAt", FieldValue.ServerTimestamp }
                 };
 
-                await _db.Collection("friendRequests").AddAsync(requestData);
+                var docRef = await _db.Collection("friendRequests").AddAsync(requestData);
+                Console.WriteLine($"✅ Friend request created: {docRef.Id} from {fromUserId} to {toUserId}");
 
                 return (true, "Lời mời kết bạn đã được gửi!");
             }
@@ -190,10 +191,11 @@ namespace MessagingApp.Services
 
                 var query = _db.Collection("friendRequests")
                     .WhereEqualTo("toUserId", userId)
-                    .WhereEqualTo("status", "pending")
-                    .OrderByDescending("createdAt");
+                    .WhereEqualTo("status", "pending");
 
                 var snapshot = await query.GetSnapshotAsync();
+                
+                Console.WriteLine($"Found {snapshot.Count} pending requests for user {userId}");
 
                 foreach (var doc in snapshot.Documents)
                 {

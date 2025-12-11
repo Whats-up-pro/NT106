@@ -31,8 +31,14 @@ namespace MessagingApp.Forms.Messaging
             LoadFriendsWithConversations();
 
             _theme.OnThemeChanged += OnThemeChanged;
-            StartRealtimeConversationsListener();
-            StartRealtimeFriendsListener();
+            // Delay listeners to avoid exceeding quota
+            _ = Task.Delay(2000).ContinueWith(_ =>
+            {
+                if (this.IsHandleCreated)
+                {
+                    try { this.BeginInvoke(new Action(StartRealtimeConversationsListener)); } catch { }
+                }
+            });
         }
 
         private void InitializeComponent()
@@ -313,13 +319,20 @@ namespace MessagingApp.Forms.Messaging
             string? currentUserId = _authService.CurrentUserId;
             if (currentUserId == null) return;
 
-            _convListener = _messagingService.ListenToConversations(currentUserId, () =>
+            try
             {
-                if (this.IsHandleCreated)
+                _convListener = _messagingService.ListenToConversations(currentUserId, () =>
                 {
-                    try { this.BeginInvoke(new Action(() => LoadFriendsWithConversations())); } catch { }
-                }
-            });
+                    if (this.IsHandleCreated)
+                    {
+                        try { this.BeginInvoke(new Action(() => LoadFriendsWithConversations())); } catch { }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error starting conversations listener: {ex.Message}");
+            }
         }
 
         private void StartRealtimeFriendsListener()
@@ -327,13 +340,20 @@ namespace MessagingApp.Forms.Messaging
             string? currentUserId = _authService.CurrentUserId;
             if (currentUserId == null) return;
 
-            _friendsListener = _friendsService.ListenToFriendships(currentUserId, () =>
+            try
             {
-                if (this.IsHandleCreated)
+                _friendsListener = _friendsService.ListenToFriendships(currentUserId, () =>
                 {
-                    try { this.BeginInvoke(new Action(() => LoadFriendsWithConversations())); } catch { }
-                }
-            });
+                    if (this.IsHandleCreated)
+                    {
+                        try { this.BeginInvoke(new Action(() => LoadFriendsWithConversations())); } catch { }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error starting friends listener: {ex.Message}");
+            }
         }
 
         private static string GetDisplayName(string fullName, string username, string email, string userId)

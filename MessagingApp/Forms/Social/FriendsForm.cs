@@ -35,9 +35,16 @@ namespace MessagingApp.Forms.Social
             ApplyTheme();
             LoadFriends();
 
-            StartFriendsRealtimeListener();
-
             _theme.OnThemeChanged += OnThemeChanged;
+            
+            // Delay listener to avoid exceeding quota
+            _ = Task.Delay(2000).ContinueWith(_ =>
+            {
+                if (this.IsHandleCreated)
+                {
+                    try { this.BeginInvoke(new Action(StartFriendsRealtimeListener)); } catch { }
+                }
+            });
         }
 
         private void InitializeComponent()

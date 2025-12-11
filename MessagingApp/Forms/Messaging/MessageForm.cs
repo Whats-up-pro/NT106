@@ -50,12 +50,27 @@ namespace MessagingApp.Forms.Messaging
             InitializeCustomUI();
             ApplyTheme();
             LoadMessages();
-            StartMessageListener();
             InitTyping();
-            StartTypingListener();
             StartRefreshTimer();
 
             _theme.OnThemeChanged += OnThemeChanged;
+            
+            // Delay listeners to avoid exceeding quota
+            _ = Task.Delay(1000).ContinueWith(_ =>
+            {
+                if (this.IsHandleCreated)
+                {
+                    try { this.BeginInvoke(new Action(StartMessageListener)); } catch { }
+                }
+            });
+            
+            _ = Task.Delay(3000).ContinueWith(_ =>
+            {
+                if (this.IsHandleCreated)
+                {
+                    try { this.BeginInvoke(new Action(StartTypingListener)); } catch { }
+                }
+            });
         }
 
         private void InitializeComponent()

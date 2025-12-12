@@ -79,3 +79,4 @@ Desktop.ini
 **/firebase-credentials.json
 **/Config/firebase-credentials.json
 firebase-adminsdk-*.json
+*.sql

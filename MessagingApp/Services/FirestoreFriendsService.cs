@@ -574,5 +574,28 @@ namespace MessagingApp.Services
                 return (false, $"Lỗi: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Get user profile by ID
+        /// </summary>
+        public async Task<Dictionary<string, object>?> GetUserProfile(string userId)
+        {
+            try
+            {
+                var doc = await _db.Collection("users").Document(userId).GetSnapshotAsync();
+                if (doc.Exists)
+                {
+                    var userData = doc.ToDictionary();
+                    userData["userId"] = doc.Id;
+                    return userData;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting user profile: {ex.Message}");
+                return null;
+            }
+        }
     }
 }

@@ -31,6 +31,7 @@ namespace MessagingApp.Forms.Messaging
         private RichTextBox rtbMessages = null!;
         private TextBox txtMessage = null!;
         private Button btnSend = null!;
+        private Button btnSendFile = null!;
         private System.Windows.Forms.Timer _typingTimer = null!;
         private System.Windows.Forms.Timer _refreshTimer = null!;
         private FirestoreChangeListener? _typingListener;
@@ -670,30 +671,33 @@ namespace MessagingApp.Forms.Messaging
                 btnSendFile.Enabled = false;
                 txtMessage.Enabled = false;
 
-                var fileService = FileTransferService.Instance;
-                var uploadResult = await fileService.UploadFileAsync(currentUserId, ofd.FileName);
+                // TODO: FileTransferService chưa được implement
+                //var fileService = FileTransferService.Instance;
+                //var uploadResult = await fileService.UploadFileAsync(currentUserId, ofd.FileName);
 
-                if (!uploadResult.success || uploadResult.publicUrl == null)
-                {
-                    MessageBox.Show(uploadResult.message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                else
-                {
-                    var fileInfo = new System.IO.FileInfo(ofd.FileName);
-                    var (success, message) = await _messagingService.SendFileMessage(
-                        _conversationId,
-                        currentUserId,
-                        fileInfo.Name,
-                        uploadResult.publicUrl,
-                        fileInfo.Length,
-                        "application/octet-stream"
-                    );
+                //if (!uploadResult.success || uploadResult.publicUrl == null)
+                //{
+                //    MessageBox.Show(uploadResult.message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                //}
+                //else
+                //{
+                //    var fileInfo = new System.IO.FileInfo(ofd.FileName);
+                //    var (success, message) = await _messagingService.SendFileMessage(
+                //        _conversationId,
+                //        currentUserId,
+                //        fileInfo.Name,
+                //        uploadResult.publicUrl,
+                //        fileInfo.Length,
+                //        "application/octet-stream"
+                //    );
 
-                    if (!success)
-                    {
-                        MessageBox.Show(message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
+                //    if (!success)
+                //    {
+                //        MessageBox.Show(message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                //    }
+                //}
+
+                MessageBox.Show("Tính năng gửi tệp đang được phát triển!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 btnSend.Enabled = true;
                 btnSendFile.Enabled = true;

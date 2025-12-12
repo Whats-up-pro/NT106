@@ -59,12 +59,14 @@ namespace MessagingApp.Config
                 Path.Combine(baseDir, fileName),
             };
 
-            // Walk upward a few levels and probe Config/ and MessagingApp/Config/
+            // Walk upward a few levels and probe Config/ and common repo folders
             DirectoryInfo? dir = new DirectoryInfo(baseDir);
             for (int i = 0; i < 8 && dir != null; i++)
             {
                 candidates.Add(Path.Combine(dir.FullName, "Config", fileName));
                 candidates.Add(Path.Combine(dir.FullName, "MessagingApp", "Config", fileName));
+                candidates.Add(Path.Combine(dir.FullName, "MessagingApp.Core", "Config", fileName));
+                candidates.Add(Path.Combine(dir.FullName, "3Mess", "Config", fileName));
                 dir = dir.Parent;
             }
 

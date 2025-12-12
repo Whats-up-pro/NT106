@@ -92,21 +92,35 @@ namespace MessagingApp.Services
                     return (false, "Bạn không thể gửi lời mời kết bạn cho chính mình!");
                 }
 
-                // Check if already friends
+                // Check if already friends (any existing friendship doc for this pair)
                 var existingFriendship = await GetFriendship(fromUserId, toUserId);
                 if (existingFriendship != null)
                 {
-                    return (false, "Đã là bạn bè hoặc đã gửi lời mời!");
+                    return (false, "Hai bạn đã là bạn bè!");
                 }
 
-                // Check if there's a pending request
+                // Check if there's already a pending request in either direction
                 var existingRequest = await GetFriendRequest(fromUserId, toUserId);
                 if (existingRequest != null)
                 {
-                    return (false, "Lời mời kết bạn đã được gửi trước đó!");
+                    return (false, "Lời mời kết bạn đã tồn tại, vui lòng chờ phản hồi.");
                 }
 
-                // Create friend request
+                // Idempotent creation: use deterministic document ID for the pending request
+                string canonicalId = GetCanonicalPairId(fromUserId, toUserId);
+                var requestRef = _db.Collection("friendRequests").Document(canonicalId);
+                var requestSnap = await requestRef.GetSnapshotAsync();
+
+                if (requestSnap.Exists)
+                {
+                    // Nếu doc đã tồn tại nhưng status không còn pending thì cho phép gửi lại
+                    string status = requestSnap.ContainsField("status") ? requestSnap.GetValue<string>("status") : "";
+                    if (string.Equals(status, "pending", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return (false, "Lời mời kết bạn đã tồn tại, vui lòng chờ phản hồi.");
+                    }
+                }
+
                 var requestData = new Dictionary<string, object>
                 {
                     { "fromUserId", fromUserId },
@@ -115,9 +129,9 @@ namespace MessagingApp.Services
                     { "createdAt", FieldValue.ServerTimestamp }
                 };
 
-                await _db.Collection("friendRequests").AddAsync(requestData);
+                await requestRef.SetAsync(requestData, SetOptions.Overwrite);
 
-                return (true, "Lời mời kết bạn đã được gửi!");
+                return (true, "Đã gửi lời mời kết bạn!");
             }
             catch (Exception ex)
             {
@@ -337,6 +351,17 @@ namespace MessagingApp.Services
                     });
                 });
 
+                // Best-effort: clean up any duplicate friendship docs that may exist from older logic
+                try
+                {
+                    string canonicalId = GetCanonicalPairId(fromUserId, toUserId);
+                    await CleanupDuplicateFriendships(fromUserId, toUserId, canonicalId);
+                }
+                catch (Exception cleanupEx)
+                {
+                    Console.WriteLine($"Cleanup duplicates failed: {cleanupEx.Message}");
+                }
+
                 return (true, "Đã chấp nhận lời mời kết bạn!");
             }
             catch (Exception ex)
@@ -396,6 +421,22 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
+        /// Listen to a user's presence/status changes in real-time.
+        /// </summary>
+        public FirestoreChangeListener ListenToUserStatus(string userId, Action onChanged)
+        {
+            var docRef = _db.Collection("users").Document(userId);
+            return docRef.Listen(_ =>
+            {
+                try { onChanged(); }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in user status listener callback: {ex.Message}");
+                }
+            });
+        }
+
+        /// <summary>
         /// Decline friend request
         /// </summary>
         public async Task<(bool success, string message)> DeclineFriendRequest(string requestId)
@@ -424,6 +465,7 @@ namespace MessagingApp.Services
             try
             {
                 var friends = new List<Dictionary<string, object>>();
+                var seen = new HashSet<string>();
 
                 var query = _db.Collection("friendships")
                     .WhereArrayContains("users", userId);
@@ -452,6 +494,10 @@ namespace MessagingApp.Services
                     if (string.IsNullOrEmpty(otherId))
                         continue;
 
+                    // Skip duplicates if multiple friendship documents exist for the same pair
+                    if (seen.Contains(otherId))
+                        continue;
+
                     // Get friend's info
                     var friendDoc = await _db.Collection("users").Document(otherId).GetSnapshotAsync();
                     
@@ -460,7 +506,12 @@ namespace MessagingApp.Services
                         var friendData = friendDoc.ToDictionary();
                         friendData["userId"] = otherId;
                         friendData["friendshipId"] = doc.Id;
+                        if (!friendData.ContainsKey("status") || friendData["status"] == null)
+                        {
+                            friendData["status"] = "offline";
+                        }
                         friends.Add(friendData);
+                        seen.Add(otherId);
                     }
                 }
 
@@ -470,6 +521,41 @@ namespace MessagingApp.Services
             {
                 Console.WriteLine($"Error getting friends: {ex.Message}");
                 return new List<Dictionary<string, object>>();
+            }
+        }
+
+        /// <summary>
+        /// Remove duplicate friendship documents for a user pair, keeping only the canonical document id
+        /// </summary>
+        private async Task CleanupDuplicateFriendships(string userId1, string userId2, string keepDocumentId)
+        {
+            try
+            {
+                var query = await _db.Collection("friendships")
+                    .WhereArrayContains("users", userId1)
+                    .GetSnapshotAsync();
+
+                foreach (var doc in query.Documents)
+                {
+                    if (doc.Id == keepDocumentId) continue;
+
+                    List<string>? users = null;
+                    try { users = doc.GetValue<List<string>>("users"); }
+                    catch
+                    {
+                        var raw = doc.GetValue<IList<object>>("users");
+                        users = raw?.Select(u => u?.ToString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToList() ?? new List<string>();
+                    }
+
+                    if (users != null && users.Contains(userId2))
+                    {
+                        await doc.Reference.DeleteAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error cleaning up duplicate friendships: {ex.Message}");
             }
         }
 
@@ -486,6 +572,29 @@ namespace MessagingApp.Services
             catch (Exception ex)
             {
                 return (false, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get user profile by ID
+        /// </summary>
+        public async Task<Dictionary<string, object>?> GetUserProfile(string userId)
+        {
+            try
+            {
+                var doc = await _db.Collection("users").Document(userId).GetSnapshotAsync();
+                if (doc.Exists)
+                {
+                    var userData = doc.ToDictionary();
+                    userData["userId"] = doc.Id;
+                    return userData;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting user profile: {ex.Message}");
+                return null;
             }
         }
     }

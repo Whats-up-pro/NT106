@@ -53,44 +53,32 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
-        /// Sign in user with email and password (Custom token approach for desktop)
-        /// Note: This is simplified. For production, use Firebase REST API or implement custom auth backend
+        /// Đăng nhập bằng email + mật khẩu (phiên bản gốc đơn giản: KHÔNG kiểm tra mật khẩu trên Admin SDK)
+        /// Lưu ý: Firebase Admin SDK không hỗ trợ xác thực mật khẩu; phiên bản này chỉ kiểm tra sự tồn tại user.
         /// </summary>
         public async Task<(bool success, string message, string? userId)> SignInWithEmailPassword(string email, string password)
         {
             try
             {
-                // Get user by email
+                // Lấy thông tin user theo email
                 var userRecord = await _auth.GetUserByEmailAsync(email);
-
                 if (userRecord == null)
                 {
                     return (false, "Không tìm thấy người dùng với email này.", null);
                 }
 
-                // Note: Firebase Admin SDK cannot verify password directly
-                // For desktop apps, you need to:
-                // 1. Use Firebase REST API for email/password sign-in
-                // 2. Or implement custom verification in Firestore
-
-                // For now, we'll use a simplified approach:
-                // Check if user exists in Firestore with matching credentials
+                // Lấy document user trong Firestore
                 var userDoc = await _db.Collection("users").Document(userRecord.Uid).GetSnapshotAsync();
-
                 if (!userDoc.Exists)
                 {
                     return (false, "Dữ liệu người dùng không tồn tại.", null);
                 }
 
                 var userData = userDoc.ToDictionary();
-
-                // TODO: Implement proper password verification
-                // For now, we assume the user exists and is valid
-
                 CurrentUserId = userRecord.Uid;
                 CurrentUserData = userData;
 
-                // Update last login
+                // Cập nhật thời gian đăng nhập + trạng thái
                 await UpdateLastLogin(userRecord.Uid);
 
                 return (true, "Đăng nhập thành công!", userRecord.Uid);

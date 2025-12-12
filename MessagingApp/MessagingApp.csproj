@@ -18,9 +18,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
-  <!-- Link code from ../sendfile folder into this project -->
-  <ItemGroup>
-    <Compile Include="..\sendfile\FileTransferService.cs" Link="Features\FileTransfer\FileTransferService.cs" />
-  </ItemGroup>
+  <!-- Khôi phục: bỏ sao chép file cấu hình phụ (API key / credentials) ở build -->
 
 </Project>

@@ -29,6 +29,8 @@ namespace MessagingApp
                 return; // Exit app if Firebase fails
             }
 
+            // (Khôi phục về phiên bản gốc: không kiểm tra API key Web ở startup)
+
             // Run login form
             Application.Run(new LoginForm());
         }

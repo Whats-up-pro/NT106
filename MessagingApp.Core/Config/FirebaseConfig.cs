@@ -22,6 +22,24 @@ namespace MessagingApp.Config
         public const string ProjectId = "nt106-messagingapp"; // TODO: Replace with actual project ID
 
         /// <summary>
+        /// Firebase Storage bucket.
+        /// You can override by setting env var FIREBASE_STORAGE_BUCKET (recommended).
+        /// Default fallback is "{ProjectId}.appspot.com".
+        /// </summary>
+        public static string StorageBucket
+        {
+            get
+            {
+                string? env = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_BUCKET");
+                if (!string.IsNullOrWhiteSpace(env))
+                {
+                    return env.Trim();
+                }
+                return ProjectId + ".appspot.com";
+            }
+        }
+
+        /// <summary>
         /// Path to Firebase credentials JSON file
         /// </summary>
         private static string CredentialsPath
@@ -45,6 +63,14 @@ namespace MessagingApp.Config
                 // Fallback: BaseDirectory/Config
                 return Path.Combine(AppContext.BaseDirectory, "Config", "firebase-credentials.json");
             }
+        }
+
+        /// <summary>
+        /// Get the resolved credentials path (service account JSON). Useful for Google Cloud clients (e.g., Storage).
+        /// </summary>
+        public static string GetCredentialsPath()
+        {
+            return CredentialsPath;
         }
 
         private static string? TryFindCredentialsPath()

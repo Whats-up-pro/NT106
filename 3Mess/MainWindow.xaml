@@ -119,6 +119,22 @@
                         CornerRadius="16" Padding="14,10" MaxWidth="640">
                     <StackPanel>
                         <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="#FF111827" FontSize="15" />
+
+                        <TextBlock x:Name="LinkBlock" Visibility="Collapsed" TextWrapping="Wrap" FontSize="15">
+                            <Hyperlink NavigateUri="{Binding LinkUri}" RequestNavigate="Hyperlink_RequestNavigate">
+                                <Run Text="{Binding LinkText}" />
+                            </Hyperlink>
+                        </TextBlock>
+
+                        <Border x:Name="ImageBlock" Visibility="Collapsed" CornerRadius="12" ClipToBounds="True" Margin="0,2,0,0">
+                            <Image Source="{Binding Image}" Stretch="Uniform" MaxHeight="260" />
+                        </Border>
+
+                        <StackPanel x:Name="FileBlock" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,0">
+                            <TextBlock Text="{Binding FileName}" TextWrapping="Wrap" FontSize="15" />
+                            <Button Content="Lưu" Margin="10,0,0,0" Padding="10,2" Click="SaveFileButton_Click" />
+                        </StackPanel>
+
                         <TextBlock x:Name="TimeText" Text="{Binding TimeText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
                     </StackPanel>
                 </Border>
@@ -137,6 +153,7 @@
                     <Setter TargetName="Bubble" Property="Background" Value="#FF7C3AED" />
                     <Setter TargetName="Bubble" Property="BorderBrush" Value="#FF6D28D9" />
                     <Setter TargetName="MessageText" Property="Foreground" Value="White" />
+                    <Setter TargetName="LinkBlock" Property="Foreground" Value="White" />
                     <Setter TargetName="TimeText" Property="Foreground" Value="#FFE9D5FF" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsOutgoing}" Value="False">
@@ -144,7 +161,28 @@
                     <Setter TargetName="Bubble" Property="Background" Value="#FF7C3AED" />
                     <Setter TargetName="Bubble" Property="BorderBrush" Value="#FF6D28D9" />
                     <Setter TargetName="MessageText" Property="Foreground" Value="White" />
+                    <Setter TargetName="LinkBlock" Property="Foreground" Value="White" />
                     <Setter TargetName="TimeText" Property="Foreground" Value="#FFE9D5FF" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Kind}" Value="Link">
+                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="ImageBlock" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="LinkBlock" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Kind}" Value="Image">
+                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="LinkBlock" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="FileBlock" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="ImageBlock" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Kind}" Value="File">
+                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="LinkBlock" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="ImageBlock" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="FileBlock" Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
@@ -264,7 +302,13 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Button Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB">
+                            <Button x:Name="AttachButton" Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB" Click="AttachButton_Click">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Gửi ảnh..." Click="SendImageMenuItem_Click" />
+                                        <MenuItem Header="Gửi file..." Click="SendFileMenuItem_Click" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
                                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;" FontSize="16" Foreground="#FF6B7280" />
                             </Button>
 

@@ -3,6 +3,9 @@
 public enum MessageBubbleKind
 {
     Text,
+    Link,
+    Image,
+    File,
     System
 }
 

@@ -118,23 +118,74 @@ namespace MessagingApp.Services
         /// </summary>
         public async Task<(bool success, string message)> SendMessage(string conversationId, string senderId, string content)
         {
+            return await SendMessage(conversationId, senderId, content, "text");
+        }
+
+        /// <summary>
+        /// Send a message with type (text/link/image). Content is stored in the same "content" field.
+        /// </summary>
+        public async Task<(bool success, string message)> SendMessage(string conversationId, string senderId, string content, string type)
+        {
+            return await SendMessage(conversationId, senderId, content, type, extraFields: null);
+        }
+
+        /// <summary>
+        /// Send a message with type and optional extra fields (e.g., fileName, size).
+        /// </summary>
+        public async Task<(bool success, string message)> SendMessage(
+            string conversationId,
+            string senderId,
+            string content,
+            string type,
+            Dictionary<string, object>? extraFields)
+        {
             try
             {
+                type = string.IsNullOrWhiteSpace(type) ? "text" : type.Trim().ToLowerInvariant();
+
                 var messageData = new Dictionary<string, object>
                 {
                     { "conversationId", conversationId },
                     { "senderId", senderId },
                     { "content", content },
+                    { "type", type },
                     { "timestamp", Timestamp.GetCurrentTimestamp() },
                     { "read", false }
                 };
 
+                if (extraFields != null)
+                {
+                    foreach (var kv in extraFields)
+                    {
+                        // Avoid overriding core fields
+                        if (string.Equals(kv.Key, "conversationId", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(kv.Key, "senderId", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(kv.Key, "content", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(kv.Key, "type", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(kv.Key, "timestamp", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.Equals(kv.Key, "read", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        messageData[kv.Key] = kv.Value;
+                    }
+                }
+
                 await _db.Collection("messages").AddAsync(messageData);
 
-                // Update conversation's last message
+                string lastMessagePreview = type switch
+                {
+                    "image" => "[Ảnh]",
+                    "file" => "[File]",
+                    "link" => content,
+                    _ => content
+                };
+                if (lastMessagePreview.Length > 50)
+                {
+                    lastMessagePreview = lastMessagePreview.Substring(0, 50) + "...";
+                }
+
                 await _db.Collection("conversations").Document(conversationId).UpdateAsync(new Dictionary<string, object>
                 {
-                    { "lastMessage", content.Length > 50 ? content.Substring(0, 50) + "..." : content },
+                    { "lastMessage", lastMessagePreview },
                     { "lastMessageAt", FieldValue.ServerTimestamp }
                 });
 

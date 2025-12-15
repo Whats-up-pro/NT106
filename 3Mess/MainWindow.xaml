@@ -103,7 +103,7 @@
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type vm:MessageItemViewModel}">
-            <Grid Margin="8,6">
+            <Grid x:Name="MessageRow" Margin="8,6" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -115,29 +115,43 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
                 </Border>
 
-                <Border x:Name="Bubble" Grid.Column="1" Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1"
-                        CornerRadius="16" Padding="14,10" MaxWidth="640">
-                    <StackPanel>
-                        <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="#FF111827" FontSize="15" />
+                <StackPanel x:Name="BubbleRow" Grid.Column="1" Orientation="Horizontal" Background="Transparent">
+                    <!-- Outgoing: action button on the LEFT of bubble -->
+                    <Button x:Name="LeftActionButton"
+                            Width="28" Height="28"
+                            Margin="0,0,6,0"
+                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                            Cursor="Hand"
+                            Visibility="Collapsed"
+                            Opacity="0.55"
+                            Command="{Binding DataContext.RevokeMessageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12" Foreground="#FF6B7280"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
 
-                        <TextBlock x:Name="LinkBlock" Visibility="Collapsed" TextWrapping="Wrap" FontSize="15">
-                            <Hyperlink NavigateUri="{Binding LinkUri}" RequestNavigate="Hyperlink_RequestNavigate">
-                                <Run Text="{Binding LinkText}" />
-                            </Hyperlink>
-                        </TextBlock>
-
-                        <Border x:Name="ImageBlock" Visibility="Collapsed" CornerRadius="12" ClipToBounds="True" Margin="0,2,0,0">
-                            <Image Source="{Binding Image}" Stretch="Uniform" MaxHeight="260" />
-                        </Border>
-
-                        <StackPanel x:Name="FileBlock" Visibility="Collapsed" Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="{Binding FileName}" TextWrapping="Wrap" FontSize="15" />
-                            <Button Content="Lưu" Margin="10,0,0,0" Padding="10,2" Click="SaveFileButton_Click" />
+                    <Border x:Name="Bubble" Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                            CornerRadius="16" Padding="14,10" MaxWidth="640">
+                        <StackPanel>
+                            <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="#FF111827" FontSize="15" />
+                            <TextBlock x:Name="TimeText" Text="{Binding TimeText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
                         </StackPanel>
+                    </Border>
 
-                        <TextBlock x:Name="TimeText" Text="{Binding TimeText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
-                    </StackPanel>
-                </Border>
+                    <!-- Incoming: action button on the RIGHT of bubble (local hide) -->
+                    <Button x:Name="RightActionButton"
+                            Width="28" Height="28"
+                            Margin="6,0,0,0"
+                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                            Cursor="Hand"
+                            Visibility="Collapsed"
+                            Opacity="0.55"
+                            Command="{Binding DataContext.HideMessageLocallyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12" Foreground="#FF6B7280"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </StackPanel>
 
                 <Border x:Name="RightAvatar" Grid.Column="2" Width="28" Height="28" CornerRadius="14" Background="#FFE5E7EB" VerticalAlignment="Bottom" Margin="8,0,0,0" Visibility="Collapsed">
                     <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
@@ -149,41 +163,37 @@
                 <DataTrigger Binding="{Binding IsOutgoing}" Value="True">
                     <Setter TargetName="LeftAvatar" Property="Visibility" Value="Collapsed" />
                     <Setter TargetName="RightAvatar" Property="Visibility" Value="Visible" />
-                    <Setter TargetName="Bubble" Property="HorizontalAlignment" Value="Right" />
+                    <Setter TargetName="BubbleRow" Property="HorizontalAlignment" Value="Right" />
                     <Setter TargetName="Bubble" Property="Background" Value="#FF7C3AED" />
                     <Setter TargetName="Bubble" Property="BorderBrush" Value="#FF6D28D9" />
                     <Setter TargetName="MessageText" Property="Foreground" Value="White" />
-                    <Setter TargetName="LinkBlock" Property="Foreground" Value="White" />
                     <Setter TargetName="TimeText" Property="Foreground" Value="#FFE9D5FF" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsOutgoing}" Value="False">
-                    <Setter TargetName="Bubble" Property="HorizontalAlignment" Value="Left" />
+                    <Setter TargetName="BubbleRow" Property="HorizontalAlignment" Value="Left" />
                     <Setter TargetName="Bubble" Property="Background" Value="#FF7C3AED" />
                     <Setter TargetName="Bubble" Property="BorderBrush" Value="#FF6D28D9" />
                     <Setter TargetName="MessageText" Property="Foreground" Value="White" />
-                    <Setter TargetName="LinkBlock" Property="Foreground" Value="White" />
                     <Setter TargetName="TimeText" Property="Foreground" Value="#FFE9D5FF" />
                 </DataTrigger>
 
-                <DataTrigger Binding="{Binding Kind}" Value="Link">
-                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="ImageBlock" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="LinkBlock" Property="Visibility" Value="Visible" />
-                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsOutgoing}" Value="True" />
+                        <Condition Binding="{Binding IsMouseOver, ElementName=MessageRow}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="LeftActionButton" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="RightActionButton" Property="Visibility" Value="Collapsed" />
+                </MultiDataTrigger>
 
-                <DataTrigger Binding="{Binding Kind}" Value="Image">
-                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="LinkBlock" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="FileBlock" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="ImageBlock" Property="Visibility" Value="Visible" />
-                </DataTrigger>
-
-                <DataTrigger Binding="{Binding Kind}" Value="File">
-                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="LinkBlock" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="ImageBlock" Property="Visibility" Value="Collapsed" />
-                    <Setter TargetName="FileBlock" Property="Visibility" Value="Visible" />
-                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsOutgoing}" Value="False" />
+                        <Condition Binding="{Binding IsMouseOver, ElementName=MessageRow}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="RightActionButton" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="LeftActionButton" Property="Visibility" Value="Collapsed" />
+                </MultiDataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>
@@ -302,13 +312,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Button x:Name="AttachButton" Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB" Click="AttachButton_Click">
-                                <Button.ContextMenu>
-                                    <ContextMenu>
-                                        <MenuItem Header="Gửi ảnh..." Click="SendImageMenuItem_Click" />
-                                        <MenuItem Header="Gửi file..." Click="SendFileMenuItem_Click" />
-                                    </ContextMenu>
-                                </Button.ContextMenu>
+                            <Button Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB">
                                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;" FontSize="16" Foreground="#FF6B7280" />
                             </Button>
 

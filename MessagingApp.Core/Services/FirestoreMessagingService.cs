@@ -442,5 +442,49 @@ namespace MessagingApp.Services
                 onTypingChanged(isTyping);
             });
         }
+
+        /// <summary>
+        /// Delete (revoke) a message by its document id. Only the sender can delete their own message.
+        /// </summary>
+        public async Task<(bool success, string message)> DeleteMessageAsync(string messageId, string requesterUserId)
+        {
+            if (string.IsNullOrWhiteSpace(messageId))
+                return (false, "Thiếu messageId.");
+            if (string.IsNullOrWhiteSpace(requesterUserId))
+                return (false, "Thiếu người dùng hiện tại.");
+
+            try
+            {
+                var docRef = _db.Collection("messages").Document(messageId);
+                var snapshot = await docRef.GetSnapshotAsync();
+                if (!snapshot.Exists)
+                {
+                    // Consider it already deleted.
+                    return (true, "Tin nhắn đã được thu hồi.");
+                }
+
+                string senderId = string.Empty;
+                try
+                {
+                    if (snapshot.ContainsField("senderId"))
+                    {
+                        senderId = snapshot.GetValue<string>("senderId");
+                    }
+                }
+                catch { }
+
+                if (!string.IsNullOrWhiteSpace(senderId) && senderId != requesterUserId)
+                {
+                    return (false, "Bạn chỉ có thể thu hồi tin nhắn của chính mình.");
+                }
+
+                await docRef.DeleteAsync();
+                return (true, "Tin nhắn đã được thu hồi.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
+            }
+        }
     }
 }

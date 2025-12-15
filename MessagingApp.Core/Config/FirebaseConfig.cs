@@ -21,6 +21,22 @@ namespace MessagingApp.Config
         /// </summary>
         public const string ProjectId = "nt106-messagingapp"; // TODO: Replace with actual project ID
 
+        private static GoogleCredential LoadCredential(string path)
+        {
+            // GoogleCredential.FromFile is marked obsolete in newer Google.Apis.Auth versions.
+            // Prefer the CredentialFactory API, but keep a safe fallback.
+            try
+            {
+                return CredentialFactory.FromFile<ServiceAccountCredential>(path).ToGoogleCredential();
+            }
+            catch
+            {
+#pragma warning disable CS0618
+                return GoogleCredential.FromFile(path);
+#pragma warning restore CS0618
+            }
+        }
+
         /// <summary>
         /// Firebase Storage bucket.
         /// You can override by setting env var FIREBASE_STORAGE_BUCKET (recommended).
@@ -146,7 +162,7 @@ namespace MessagingApp.Config
 
                     _firebaseApp = FirebaseApp.Create(new AppOptions
                     {
-                        Credential = GoogleCredential.FromFile(CredentialsPath),
+                        Credential = LoadCredential(CredentialsPath),
                         ProjectId = ProjectId
                     });
 

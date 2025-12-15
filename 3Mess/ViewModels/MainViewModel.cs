@@ -34,6 +34,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<MemberItemViewModel> Members { get; } = new();
 
     private readonly List<FriendItemViewModel> _allFriends = new();
+    private readonly HashSet<string> _locallyHiddenMessageIds = new(StringComparer.Ordinal);
 
     public string SearchText
     {
@@ -86,6 +87,8 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public ICommand SendMessageCommand { get; }
+    public ICommand RevokeMessageCommand { get; }
+    public ICommand HideMessageLocallyCommand { get; }
 
     public MainViewModel()
     {
@@ -97,6 +100,20 @@ public sealed class MainViewModel : ObservableObject
         SendMessageCommand = new RelayCommand(
             () => _ = SendMessageAsync(),
             () => SelectedConversation != null && !string.IsNullOrWhiteSpace(DraftMessage));
+
+        RevokeMessageCommand = new RelayCommand<MessageItemViewModel>(
+            msg => _ = RevokeMessageAsync(msg),
+            msg => msg != null
+                   && msg.IsOutgoing
+                   && !string.IsNullOrWhiteSpace(msg.MessageId)
+                   && SelectedConversation != null);
+
+        HideMessageLocallyCommand = new RelayCommand<MessageItemViewModel>(
+            msg => _ = HideMessageLocallyAsync(msg),
+            msg => msg != null
+                   && !msg.IsOutgoing
+                   && !string.IsNullOrWhiteSpace(msg.MessageId)
+                   && SelectedConversation != null);
 
         _ = LoadFriendsAsync();
     }
@@ -204,6 +221,8 @@ public sealed class MainViewModel : ObservableObject
             Members.Clear();
         });
 
+        _locallyHiddenMessageIds.Clear();
+
         if (conversation == null) return;
 
         string? currentUserId = _authService.CurrentUserId;
@@ -253,6 +272,7 @@ public sealed class MainViewModel : ObservableObject
             .Where(m => m.ContainsKey("senderId") && m.ContainsKey("content"))
             .Select(m =>
             {
+                string messageId = m.TryGetValue("messageId", out var mid) ? mid?.ToString() ?? string.Empty : string.Empty;
                 string senderId = m["senderId"]?.ToString() ?? string.Empty;
                 string content = m["content"]?.ToString() ?? string.Empty;
                 string type = m.TryGetValue("type", out var tObj) ? (tObj?.ToString() ?? "text") : "text";
@@ -261,6 +281,8 @@ public sealed class MainViewModel : ObservableObject
 
                 var vm = new MessageItemViewModel
                 {
+                    MessageId = messageId,
+                    SenderId = senderId,
                     IsOutgoing = outgoing,
                     Time = dt == DateTime.MinValue ? DateTime.Now : dt,
                     SenderAvatarText = outgoing ? "B" : IncomingAvatarText
@@ -303,6 +325,7 @@ public sealed class MainViewModel : ObservableObject
 
                 return vm;
             })
+            .Where(vm => string.IsNullOrWhiteSpace(vm.MessageId) || !_locallyHiddenMessageIds.Contains(vm.MessageId))
             .ToList();
 
         Application.Current.Dispatcher.BeginInvoke(() =>
@@ -313,6 +336,75 @@ public sealed class MainViewModel : ObservableObject
                 Messages.Add(vm);
             }
         });
+    }
+
+    private async Task RevokeMessageAsync(MessageItemViewModel? msg)
+    {
+        if (msg == null) return;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        if (!msg.IsOutgoing || string.IsNullOrWhiteSpace(msg.MessageId)) return;
+
+        var result = MessageBox.Show(
+            "Bạn có chắc chắn muốn thu hồi tin nhắn không?",
+            "Thu hồi tin nhắn",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            var (success, message) = await _messagingService.DeleteMessageAsync(msg.MessageId, currentUserId);
+            if (!success)
+            {
+                MessageBox.Show(message, "Không thể thu hồi", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Make it disappear immediately; listener will keep it consistent.
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                var existing = Messages.FirstOrDefault(m => m.MessageId == msg.MessageId);
+                if (existing != null)
+                {
+                    Messages.Remove(existing);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi: {ex.Message}", "Không thể thu hồi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private Task HideMessageLocallyAsync(MessageItemViewModel? msg)
+    {
+        if (msg == null) return Task.CompletedTask;
+        if (msg.IsOutgoing) return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(msg.MessageId)) return Task.CompletedTask;
+
+        var result = MessageBox.Show(
+            "Bạn có chắc chắn muốn xóa tin nhắn này khỏi khung chat không?\n(Lưu ý: thao tác này chỉ ẩn ở phía bạn, không ảnh hưởng người gửi)",
+            "Xóa tin nhắn",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return Task.CompletedTask;
+
+        _locallyHiddenMessageIds.Add(msg.MessageId);
+        Application.Current.Dispatcher.BeginInvoke(() =>
+        {
+            var existing = Messages.FirstOrDefault(m => m.MessageId == msg.MessageId);
+            if (existing != null)
+            {
+                Messages.Remove(existing);
+            }
+        });
+
+        return Task.CompletedTask;
     }
 
     private static DateTime ExtractTimestamp(Dictionary<string, object> msg)

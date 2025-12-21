@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ThreeMess"
         xmlns:vm="clr-namespace:ThreeMess.ViewModels"
+    xmlns:models="clr-namespace:ThreeMess.Models"
         mc:Ignorable="d"
         Title="MessagingApp" Height="720" Width="1180" MinHeight="640" MinWidth="1050"
         WindowStartupLocation="CenterScreen">
@@ -134,6 +135,59 @@
                             CornerRadius="16" Padding="14,10" MaxWidth="640">
                         <StackPanel>
                             <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="#FF111827" FontSize="15" />
+                            <Image x:Name="MessageImage"
+                                   Source="{Binding Image}"
+                                   Visibility="Collapsed"
+                                   Margin="0,0,0,6"
+                                   MaxWidth="360"
+                                   MaxHeight="240"
+                                    Stretch="Uniform"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="MessageImage_MouseLeftButtonUp" />
+
+                            <Border x:Name="MessageFile"
+                                    Visibility="Collapsed"
+                                    Background="#0FFFFFFF"
+                                    BorderBrush="#40FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10"
+                                    Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" FontSize="16" Foreground="White" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding FileName}" Margin="10,0,10,0" VerticalAlignment="Center"
+                                               Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <Button Grid.Column="2" Width="70" Height="28" Margin="0"
+                                            Background="#33FFFFFF" BorderBrush="#55FFFFFF" BorderThickness="1"
+                                            Foreground="White" Cursor="Hand"
+                                            Click="SaveFileButton_Click">
+                                        <TextBlock Text="Lưu" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <Border x:Name="MessageLink"
+                                    Visibility="Collapsed"
+                                    Background="#0FFFFFFF"
+                                    BorderBrush="#40FFFFFF"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="10"
+                                    Margin="0,0,0,6">
+                                <TextBlock TextWrapping="Wrap">
+                                    <Hyperlink NavigateUri="{Binding LinkUri}"
+                                               RequestNavigate="Hyperlink_RequestNavigate"
+                                               Foreground="White">
+                                        <Run Text="{Binding LinkText}" />
+                                    </Hyperlink>
+                                </TextBlock>
+                            </Border>
+
                             <TextBlock x:Name="TimeText" Text="{Binding TimeText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
@@ -175,6 +229,24 @@
                     <Setter TargetName="Bubble" Property="BorderBrush" Value="#FF6D28D9" />
                     <Setter TargetName="MessageText" Property="Foreground" Value="White" />
                     <Setter TargetName="TimeText" Property="Foreground" Value="#FFE9D5FF" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:MessageBubbleKind.Image}">
+                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="MessageImage" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:MessageBubbleKind.File}">
+                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="MessageImage" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="MessageFile" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:MessageBubbleKind.Link}">
+                    <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="MessageImage" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="MessageFile" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="MessageLink" Property="Visibility" Value="Visible" />
                 </DataTrigger>
 
                 <MultiDataTrigger>
@@ -312,7 +384,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Button Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB">
+                            <Button Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB" Click="AttachButton_Click">
                                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;" FontSize="16" Foreground="#FF6B7280" />
                             </Button>
 

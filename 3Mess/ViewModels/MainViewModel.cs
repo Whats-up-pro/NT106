@@ -308,11 +308,12 @@ public sealed class MainViewModel : ObservableObject
                         break;
                     default:
                         // Treat pure URL as a clickable link without needing a separate "send link" feature.
-                        var uri = TryCreateHttpUri(content);
-                        if (uri != null && string.Equals(content.Trim(), uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
+                        var trimmed = content.Trim();
+                        var uri = TryCreateHttpUri(trimmed);
+                        if (uri != null)
                         {
                             vm.Kind = MessageBubbleKind.Link;
-                            vm.LinkText = uri.AbsoluteUri;
+                            vm.LinkText = trimmed;
                             vm.LinkUri = uri;
                         }
                         else
@@ -365,7 +366,7 @@ public sealed class MainViewModel : ObservableObject
             }
 
             // Make it disappear immediately; listener will keep it consistent.
-            Application.Current.Dispatcher.BeginInvoke(() =>
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 var existing = Messages.FirstOrDefault(m => m.MessageId == msg.MessageId);
                 if (existing != null)
@@ -468,6 +469,22 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        try
+        {
+            var info = new FileInfo(filePath);
+            const long maxBytes = 25L * 1024 * 1024;
+            if (info.Length > maxBytes)
+            {
+                MessageBox.Show("File quá lớn. Giới hạn hiện tại: 25MB.", "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        catch
+        {
+            MessageBox.Show("Không thể đọc thông tin file.", "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         // Firestore document size is limited; keep images small by resizing + JPEG encoding.
         var attemptSettings = new (int maxDim, int quality)[]
         {
@@ -522,10 +539,10 @@ public sealed class MainViewModel : ObservableObject
         }
 
         var info = new FileInfo(filePath);
-        const long maxBytes = 50L * 1024 * 1024;
+        const long maxBytes = 25L * 1024 * 1024;
         if (info.Length > maxBytes)
         {
-            MessageBox.Show("File quá lớn. Giới hạn hiện tại: 50MB.", "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("File quá lớn. Giới hạn hiện tại: 25MB.", "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -566,7 +583,20 @@ public sealed class MainViewModel : ObservableObject
     private static Uri? TryCreateHttpUri(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
-        if (!Uri.TryCreate(input.Trim(), UriKind.Absolute, out var uri)) return null;
+        string trimmed = input.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            // Allow users to type "google.com" without scheme.
+            if (!trimmed.Contains("://", StringComparison.OrdinalIgnoreCase)
+                && Uri.TryCreate("https://" + trimmed, UriKind.Absolute, out var uri2))
+            {
+                uri = uri2;
+            }
+            else
+            {
+                return null;
+            }
+        }
         if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {

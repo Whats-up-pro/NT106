@@ -9,11 +9,16 @@ public sealed class MessageItemViewModel : ObservableObject
     private string _text = string.Empty;
     private DateTime _time = DateTime.Now;
     private bool _isOutgoing;
+    private MessageBubbleKind _kind = MessageBubbleKind.Text;
 
     public string MessageId { get; init; } = string.Empty;
     public string SenderId { get; init; } = string.Empty;
 
-    public MessageBubbleKind Kind { get; init; } = MessageBubbleKind.Text;
+    public MessageBubbleKind Kind
+    {
+        get => _kind;
+        set => SetProperty(ref _kind, value);
+    }
 
     public string Text
     {
@@ -35,5 +40,18 @@ public sealed class MessageItemViewModel : ObservableObject
 
     public string SenderAvatarText { get; init; } = "?";
     public string TimeText => Time.ToString("HH:mm");
+    
+    // File attachment properties
+    public string? FileName { get; set; }
+    public byte[]? FileBytes { get; set; }
+    public string? StorageBucket { get; set; }
+    public string? StorageObject { get; set; }
+    
+    // Image properties
+    public System.Windows.Media.ImageSource? Image { get; set; }
+    
+    // Link properties
+    public string? LinkText { get; set; }
+    public System.Uri? LinkUri { get; set; }
 }
 

@@ -290,34 +290,76 @@ namespace MessagingApp.Forms.Messaging
                 string content = msg["content"].ToString()!;
                 var ts = ExtractTimestamp(msg);
 
-                // Prefer a stable key: messageId if present; else sender + rounded timestamp + content
-                string key = msg.ContainsKey("messageId") && msg["messageId"] != null
+                string? messageId = msg.ContainsKey("messageId") && msg["messageId"] != null
                     ? msg["messageId"].ToString()!
-                    : BuildMergeKey(senderId, content, ts);
+                    : null;
 
-                bool hasId = msg.ContainsKey("messageId") && msg["messageId"] != null;
+                string mergeKey = BuildMergeKey(senderId, content, ts);
+                string primaryKey = messageId ?? mergeKey;
+
+                bool hasId = messageId != null;
                 bool isLocal = msg.ContainsKey("isLocal") && msg["isLocal"] is bool b && b;
 
-                if (!map.ContainsKey(key))
+                // If server message arrives with id after optimistic local message (mergeKey), upgrade it
+                if (hasId && map.ContainsKey(mergeKey))
                 {
-                    map[key] = msg;
-                    order.Add(key);
+                    var existingKeyIndex = order.IndexOf(mergeKey);
+                    if (existingKeyIndex >= 0)
+                    {
+                        order[existingKeyIndex] = primaryKey; // keep order but swap to stable id key
+                    }
+                    map.Remove(mergeKey);
                 }
-                else
+                else if (hasId)
                 {
-                    var existing = map[key];
-                    bool existingHasId = existing.ContainsKey("messageId") && existing["messageId"] != null;
-                    bool existingIsLocal = existing.ContainsKey("isLocal") && existing["isLocal"] is bool b2 && b2;
+                    // Fallback: look for any local (no id) message with same sender + content within ~10s to merge
+                    var toReplace = order.FirstOrDefault(k =>
+                    {
+                        if (!map.ContainsKey(k)) return false;
+                        var existing = map[k];
+                        bool existingHasId = existing.ContainsKey("messageId") && existing["messageId"] != null;
+                        bool existingIsLocal = existing.ContainsKey("isLocal") && existing["isLocal"] is bool b3 && b3;
+                        if (existingHasId || !existingIsLocal) return false;
 
-                    // Prefer message with real id; if both have id, keep the first
-                    if (!existingHasId && hasId)
+                        string sender2 = existing.ContainsKey("senderId") && existing["senderId"] != null ? existing["senderId"].ToString()! : string.Empty;
+                        string content2 = existing.ContainsKey("content") && existing["content"] != null ? existing["content"].ToString()! : string.Empty;
+                        if (!string.Equals(sender2, senderId, StringComparison.Ordinal)) return false;
+                        if (!string.Equals(content2, content, StringComparison.Ordinal)) return false;
+
+                        var ts2 = ExtractTimestamp(existing);
+                        var dt1 = ts;
+                        if (dt1 == DateTime.MinValue || ts2 == DateTime.MinValue) return true; // missing timestamp, still merge
+                        var diff = Math.Abs((dt1 - ts2).TotalSeconds);
+                        return diff <= 12; // allow clock drift
+                    });
+
+                    if (toReplace != null)
                     {
-                        map[key] = msg;
+                        var idx = order.IndexOf(toReplace);
+                        if (idx >= 0) order[idx] = primaryKey;
+                        map.Remove(toReplace);
                     }
-                    else if (existingIsLocal && !isLocal)
-                    {
-                        map[key] = msg;
-                    }
+                }
+
+                if (!map.ContainsKey(primaryKey))
+                {
+                    map[primaryKey] = msg;
+                    order.Add(primaryKey);
+                    continue;
+                }
+
+                var existing = map[primaryKey];
+                bool existingHasId = existing.ContainsKey("messageId") && existing["messageId"] != null;
+                bool existingIsLocal = existing.ContainsKey("isLocal") && existing["isLocal"] is bool b2 && b2;
+
+                // Prefer message with real id; if both have id, keep the first; otherwise prefer non-local over local
+                if (!existingHasId && hasId)
+                {
+                    map[primaryKey] = msg;
+                }
+                else if (existingIsLocal && !isLocal)
+                {
+                    map[primaryKey] = msg;
                 }
             }
 
@@ -599,6 +641,18 @@ namespace MessagingApp.Forms.Messaging
                 string content = msg["content"].ToString()!;
                 bool isCurrentUser = senderId == currentUserId;
 
+                // If server messageId arrives after local optimistic render, swap keys to avoid double-draw
+                string? messageId = msg.ContainsKey("messageId") && msg["messageId"] != null
+                    ? msg["messageId"].ToString()!
+                    : null;
+                string mergeKey = BuildMergeKey(senderId, content, ExtractTimestamp(msg));
+                if (messageId != null && _renderedMessageKeys.Contains(mergeKey))
+                {
+                    _renderedMessageKeys.Remove(mergeKey);
+                    _renderedMessageKeys.Add(messageId);
+                    continue; // content already shown with optimistic bubble
+                }
+
                 string timeText = "";
                 try
                 {
@@ -654,21 +708,10 @@ namespace MessagingApp.Forms.Messaging
 
                 btnSend.Enabled = false;
                 txtMessage.Enabled = false;
-
-                var timeText = DateTime.Now.ToString("HH:mm");
                 var (success, message) = await _messagingService.SendMessage(_conversationId, currentUserId, content);
 
                 if (success)
                 {
-                    var localMsg = new Dictionary<string, object>
-                    {
-                        { "senderId", currentUserId },
-                        { "content", content },
-                        { "timestamp", Google.Cloud.Firestore.Timestamp.FromDateTime(DateTime.UtcNow) },
-                        { "isLocal", true }
-                    };
-                    _cachedMessages.Add(localMsg);
-                    DisplayMessages(_cachedMessages, fullRedraw: false);
                     try
                     {
                         _typingTimer.Stop();

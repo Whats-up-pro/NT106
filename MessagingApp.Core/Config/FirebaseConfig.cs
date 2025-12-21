@@ -21,6 +21,40 @@ namespace MessagingApp.Config
         /// </summary>
         public const string ProjectId = "nt106-messagingapp"; // TODO: Replace with actual project ID
 
+        private static GoogleCredential LoadCredential(string path)
+        {
+            // GoogleCredential.FromFile is marked obsolete in newer Google.Apis.Auth versions.
+            // Prefer the CredentialFactory API, but keep a safe fallback.
+            try
+            {
+                return CredentialFactory.FromFile<ServiceAccountCredential>(path).ToGoogleCredential();
+            }
+            catch
+            {
+#pragma warning disable CS0618
+                return GoogleCredential.FromFile(path);
+#pragma warning restore CS0618
+            }
+        }
+
+        /// <summary>
+        /// Firebase Storage bucket.
+        /// You can override by setting env var FIREBASE_STORAGE_BUCKET (recommended).
+        /// Default fallback is "{ProjectId}.appspot.com".
+        /// </summary>
+        public static string StorageBucket
+        {
+            get
+            {
+                string? env = Environment.GetEnvironmentVariable("FIREBASE_STORAGE_BUCKET");
+                if (!string.IsNullOrWhiteSpace(env))
+                {
+                    return env.Trim();
+                }
+                return ProjectId + ".appspot.com";
+            }
+        }
+
         /// <summary>
         /// Path to Firebase credentials JSON file
         /// </summary>
@@ -47,6 +81,14 @@ namespace MessagingApp.Config
             }
         }
 
+        /// <summary>
+        /// Get the resolved credentials path (service account JSON). Useful for Google Cloud clients (e.g., Storage).
+        /// </summary>
+        public static string GetCredentialsPath()
+        {
+            return CredentialsPath;
+        }
+
         private static string? TryFindCredentialsPath()
         {
             const string fileName = "firebase-credentials.json";
@@ -59,12 +101,14 @@ namespace MessagingApp.Config
                 Path.Combine(baseDir, fileName),
             };
 
-            // Walk upward a few levels and probe Config/ and MessagingApp/Config/
+            // Walk upward a few levels and probe Config/ and common repo folders
             DirectoryInfo? dir = new DirectoryInfo(baseDir);
             for (int i = 0; i < 8 && dir != null; i++)
             {
                 candidates.Add(Path.Combine(dir.FullName, "Config", fileName));
                 candidates.Add(Path.Combine(dir.FullName, "MessagingApp", "Config", fileName));
+                candidates.Add(Path.Combine(dir.FullName, "MessagingApp.Core", "Config", fileName));
+                candidates.Add(Path.Combine(dir.FullName, "3Mess", "Config", fileName));
                 dir = dir.Parent;
             }
 
@@ -118,7 +162,7 @@ namespace MessagingApp.Config
 
                     _firebaseApp = FirebaseApp.Create(new AppOptions
                     {
-                        Credential = GoogleCredential.FromFile(CredentialsPath),
+                        Credential = LoadCredential(CredentialsPath),
                         ProjectId = ProjectId
                     });
 

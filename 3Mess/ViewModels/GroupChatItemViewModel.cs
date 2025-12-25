@@ -1,24 +1,25 @@
-﻿using System;
+using System.Collections.Generic;
+using System;
+using System.Windows.Media;
 using ThreeMess.Infrastructure;
 
 namespace ThreeMess.ViewModels;
 
-public sealed class FriendItemViewModel : ObservableObject
+public sealed class GroupChatItemViewModel : ObservableObject
 {
-    private string _userId = string.Empty;
+    private string _conversationId = string.Empty;
     private string _name = string.Empty;
-    private string _username = string.Empty;
-    private string _status = "offline";
-    private string _avatarText = "?";
+    private string _avatarText = "G";
+    private ImageSource? _avatarImage;
     private bool _isPinned;
     private bool _notificationsEnabled = true;
     private bool _isHidden;
     private DateTime? _lastActivityUtc;
 
-    public string UserId
+    public string ConversationId
     {
-        get => _userId;
-        set => SetProperty(ref _userId, value);
+        get => _conversationId;
+        set => SetProperty(ref _conversationId, value);
     }
 
     public string Name
@@ -27,22 +28,16 @@ public sealed class FriendItemViewModel : ObservableObject
         set => SetProperty(ref _name, value);
     }
 
-    public string Username
-    {
-        get => _username;
-        set => SetProperty(ref _username, value);
-    }
-
-    public string Status
-    {
-        get => _status;
-        set => SetProperty(ref _status, value);
-    }
-
     public string AvatarText
     {
         get => _avatarText;
         set => SetProperty(ref _avatarText, value);
+    }
+
+    public ImageSource? AvatarImage
+    {
+        get => _avatarImage;
+        set => SetProperty(ref _avatarImage, value);
     }
 
     public bool IsPinned
@@ -58,7 +53,6 @@ public sealed class FriendItemViewModel : ObservableObject
         set => SetProperty(ref _notificationsEnabled, value);
     }
 
-    // True = hidden from sidebar (used by "Xóa cuộc trò chuyện")
     public bool IsHidden
     {
         get => _isHidden;
@@ -70,5 +64,6 @@ public sealed class FriendItemViewModel : ObservableObject
         get => _lastActivityUtc;
         set => SetProperty(ref _lastActivityUtc, value);
     }
-}
 
+    public List<string> ParticipantIds { get; init; } = new();
+}

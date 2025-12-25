@@ -1,0 +1,232 @@
+<Window x:Class="ThreeMess.CreateGroupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Tạo nhóm" Height="560" Width="560"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+
+    <Grid Background="#FFF5F6F8" Margin="12">
+        <Border CornerRadius="16" Background="#FFF3F4F6" Padding="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Tạo group chat" FontWeight="SemiBold" FontSize="16" Foreground="#FF111827" />
+
+                <!-- Group name + avatar -->
+                <Grid Grid.Row="1" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="56" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Width="48" Height="48" CornerRadius="24" Background="#FFE5E7EB" VerticalAlignment="Center">
+                        <Grid>
+                            <Image Source="{Binding AvatarPreview}" Stretch="UniformToFill" />
+                            <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AvatarPreview}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="White" CornerRadius="12" Padding="10" BorderBrush="#FFE5E7EB" BorderThickness="1" Margin="8,0,8,0">
+                        <DockPanel LastChildFill="True">
+                            <TextBlock Text="Tên nhóm" Foreground="#FF6B7280" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBox Style="{StaticResource WatermarkTextBox}" Tag="Nhập tên group"
+                                     Text="{Binding GroupName, UpdateSourceTrigger=PropertyChanged}"
+                                     BorderThickness="0" Background="Transparent" Foreground="#FF111827"
+                                     FontSize="13" VerticalContentAlignment="Center" Padding="0" />
+                        </DockPanel>
+                    </Border>
+
+                    <Button Grid.Column="2" Width="110" Height="36" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                            Cursor="Hand" Command="{Binding PickAvatarCommand}">
+                        <TextBlock Text="Chọn avatar" Foreground="#FF111827" FontWeight="SemiBold" />
+                    </Button>
+                </Grid>
+
+                <!-- Search friends -->
+                <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="10" BorderBrush="#FFE5E7EB" BorderThickness="1" Margin="0,12,0,0">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="#FF6B7280" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <TextBox Style="{StaticResource WatermarkTextBox}" Tag="Tìm bạn bè để thêm"
+                                 Text="{Binding FriendSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 BorderThickness="0" Background="Transparent" Foreground="#FF111827"
+                                 FontSize="13" VerticalContentAlignment="Center" Padding="0" />
+                    </DockPanel>
+                </Border>
+
+                <!-- Pick members -->
+                <Grid Grid.Row="3" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Background="Transparent" Grid.Column="0" Margin="0,0,6,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Bạn bè" Foreground="#FF111827" FontWeight="SemiBold" Margin="2,0,0,8" />
+                            <ListBox Grid.Row="1" ItemsSource="{Binding FilteredFriends}" SelectedItem="{Binding SelectedFriend}"
+                                     BorderThickness="0" Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,0,6" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="8">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="48" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Username}" Foreground="#FF6B7280" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <Button Grid.Column="2" Width="60" Height="28" Background="#FF2563EB" Foreground="White" BorderThickness="0" Cursor="Hand"
+                                                    Command="{Binding DataContext.AddMemberCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="999">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                                <TextBlock Text="Thêm" FontWeight="SemiBold" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <Border Background="Transparent" Grid.Column="1" Margin="6,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Thành viên đã chọn" Foreground="#FF111827" FontWeight="SemiBold" Margin="2,0,0,8" />
+                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedMembers}"
+                                     BorderThickness="0" Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,0,6" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="8">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="48" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Username}" Foreground="#FF6B7280" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <Button Grid.Column="2" Width="60" Height="28" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                    Command="{Binding DataContext.RemoveMemberCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}">
+                                                <TextBlock Text="Xóa" Foreground="#FF111827" FontWeight="SemiBold" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <Grid Grid.Row="4" Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="{Binding StatusText}" Foreground="#FF6B7280" FontSize="12" VerticalAlignment="Center" />
+
+                    <Button Grid.Column="1" Width="140" Height="36" Background="#FF2563EB" Foreground="White" BorderThickness="0" Cursor="Hand"
+                            Command="{Binding CreateGroupCommand}" IsEnabled="{Binding CanCreate}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="999">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock Text="Tạo nhóm" FontWeight="SemiBold" />
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

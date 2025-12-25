@@ -23,18 +23,30 @@ public sealed class MainViewModel : ObservableObject
     private readonly FirebaseStorageService _storageService;
     private FirestoreChangeListener? _messageListener;
 
-    private FriendItemViewModel? _selectedFriend;
+    private object? _selectedSidebarItem;
     private ConversationItemViewModel? _selectedConversation;
     private string _searchText = string.Empty;
     private string _draftMessage = string.Empty;
     private string _incomingAvatarText = "A";
+    private bool _showGroups;
 
-    public ObservableCollection<FriendItemViewModel> Friends { get; } = new();
+    private string? _lastSelectedFriendUserId;
+    private string? _lastSelectedGroupConversationId;
+
+    private bool _suppressSidebarSelectionHandling;
+
+    public ObservableCollection<object> SidebarItems { get; } = new();
     public ObservableCollection<MessageItemViewModel> Messages { get; } = new();
     public ObservableCollection<MemberItemViewModel> Members { get; } = new();
 
     private readonly List<FriendItemViewModel> _allFriends = new();
+    private readonly List<GroupChatItemViewModel> _allGroups = new();
     private readonly HashSet<string> _locallyHiddenMessageIds = new(StringComparer.Ordinal);
+
+    private readonly Dictionary<string, List<MessageItemViewModel>> _messageCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DateTime> _pendingOutgoingByTempId = new(StringComparer.Ordinal);
+
+    private readonly Dictionary<string, (bool pinned, bool muted, bool hidden, DateTime? clearedAtUtc, DateTime? lastActivityUtc)> _conversationSettings = new(StringComparer.Ordinal);
 
     public string SearchText
     {
@@ -42,17 +54,42 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _searchText, value)) return;
-            ApplyFriendsFilter();
+            ApplySidebarFilter();
         }
     }
 
-    public FriendItemViewModel? SelectedFriend
+    public bool ShowGroups
     {
-        get => _selectedFriend;
+        get => _showGroups;
         set
         {
-            if (!SetProperty(ref _selectedFriend, value)) return;
-            _ = OpenChatWithFriendAsync(value);
+            if (!SetProperty(ref _showGroups, value)) return;
+            OnPropertyChanged(nameof(ShowFriends));
+            ApplySidebarFilter();
+        }
+    }
+
+    public bool ShowFriends => !ShowGroups;
+
+    public object? SelectedSidebarItem
+    {
+        get => _selectedSidebarItem;
+        set
+        {
+            if (!SetProperty(ref _selectedSidebarItem, value)) return;
+
+            if (_suppressSidebarSelectionHandling) return;
+
+            if (value is FriendItemViewModel f)
+            {
+                _lastSelectedFriendUserId = f.UserId;
+                _ = OpenChatWithFriendAsync(f);
+            }
+            else if (value is GroupChatItemViewModel g)
+            {
+                _lastSelectedGroupConversationId = g.ConversationId;
+                _ = OpenChatWithGroupAsync(g);
+            }
         }
     }
 
@@ -89,6 +126,15 @@ public sealed class MainViewModel : ObservableObject
     public ICommand SendMessageCommand { get; }
     public ICommand RevokeMessageCommand { get; }
     public ICommand HideMessageLocallyCommand { get; }
+    public ICommand OpenAddFriendCommand { get; }
+    public ICommand OpenCreateGroupCommand { get; }
+    public ICommand ShowFriendsCommand { get; }
+    public ICommand ShowGroupsCommand { get; }
+
+    public ICommand DeleteConversationCommand { get; }
+    public ICommand TogglePinConversationCommand { get; }
+    public ICommand UpdatePinnedCommand { get; }
+    public ICommand UpdateNotificationsCommand { get; }
 
     public MainViewModel()
     {
@@ -115,6 +161,57 @@ public sealed class MainViewModel : ObservableObject
                    && !string.IsNullOrWhiteSpace(msg.MessageId)
                    && SelectedConversation != null);
 
+        OpenAddFriendCommand = new RelayCommand(OpenAddFriend);
+
+        OpenCreateGroupCommand = new RelayCommand(OpenCreateGroup);
+
+        ShowFriendsCommand = new RelayCommand(() => ShowGroups = false);
+        ShowGroupsCommand = new RelayCommand(() => ShowGroups = true);
+
+        DeleteConversationCommand = new RelayCommand<object>(o => _ = DeleteConversationAsync(o), o => o != null);
+        TogglePinConversationCommand = new RelayCommand<object>(o => _ = TogglePinAsync(o), o => o != null);
+        UpdatePinnedCommand = new RelayCommand<object>(o => _ = UpdatePinnedAsync(o), o => o != null);
+        UpdateNotificationsCommand = new RelayCommand<object>(o => _ = UpdateNotificationsAsync(o), o => o != null);
+
+        _ = LoadFriendsAsync();
+        _ = LoadGroupsAsync();
+    }
+
+    private void OpenCreateGroup()
+    {
+        // Snapshot friend list for selection UI
+        var friendsSnapshot = _allFriends.ToList();
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var win = new CreateGroupWindow(friendsSnapshot)
+            {
+                Owner = Application.Current.MainWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            bool? result = win.ShowDialog();
+            if (result == true && !string.IsNullOrWhiteSpace(win.CreatedConversationId))
+            {
+                ShowGroups = true;
+                _ = LoadGroupsAsync(selectConversationId: win.CreatedConversationId);
+            }
+        });
+    }
+
+    private void OpenAddFriend()
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var win = new AddFriendWindow
+            {
+                Owner = Application.Current.MainWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            win.ShowDialog();
+        });
+
+        // If the user accepted a request, a new friendship may have been created.
         _ = LoadFriendsAsync();
     }
 
@@ -154,10 +251,10 @@ public sealed class MainViewModel : ObservableObject
             {
                 _allFriends.Clear();
                 _allFriends.AddRange(items);
-                ApplyFriendsFilter();
 
-                // Default selection
-                SelectedFriend = Friends.FirstOrDefault();
+                // Apply conversation settings (pinned/muted/hidden) to friend items
+                ApplyFriendConversationSettings();
+                ApplySidebarFilter();
             });
         }
         catch (Exception ex)
@@ -168,57 +265,591 @@ public sealed class MainViewModel : ObservableObject
 
     private void ApplyFriendsFilter()
     {
+        ApplySidebarFilter();
+    }
+
+    private void ApplySidebarFilter()
+    {
         string needle = (SearchText ?? string.Empty).Trim();
 
-        IEnumerable<FriendItemViewModel> filtered = _allFriends;
-        if (!string.IsNullOrWhiteSpace(needle))
+        var previousConversation = SelectedConversation;
+
+        _suppressSidebarSelectionHandling = true;
+        try
         {
-            filtered = filtered.Where(f =>
-                (!string.IsNullOrWhiteSpace(f.Name) && f.Name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
-                || (!string.IsNullOrWhiteSpace(f.Username) && f.Username.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0));
+            SidebarItems.Clear();
+
+            if (ShowGroups)
+            {
+                IEnumerable<GroupChatItemViewModel> groups = _allGroups;
+                if (!string.IsNullOrWhiteSpace(needle))
+                {
+                    groups = groups.Where(g => !string.IsNullOrWhiteSpace(g.Name)
+                                               && g.Name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+
+                // Hide deleted conversations by default, but still allow finding via search.
+                if (string.IsNullOrWhiteSpace(needle))
+                {
+                    groups = groups.Where(g => !g.IsHidden);
+                }
+
+                foreach (var g in groups
+                             .OrderByDescending(g => g.IsPinned)
+                             .ThenByDescending(g => g.LastActivityUtc ?? DateTime.MinValue)
+                             .ThenBy(g => g.Name))
+                {
+                    SidebarItems.Add(g);
+                }
+
+                if (!string.IsNullOrWhiteSpace(_lastSelectedGroupConversationId))
+                {
+                    var toSelect = SidebarItems.OfType<GroupChatItemViewModel>()
+                        .FirstOrDefault(x => string.Equals(x.ConversationId, _lastSelectedGroupConversationId, StringComparison.Ordinal));
+                    if (toSelect != null)
+                    {
+                        SelectedSidebarItem = toSelect;
+                    }
+                }
+            }
+            else
+            {
+                IEnumerable<FriendItemViewModel> friends = _allFriends;
+                if (!string.IsNullOrWhiteSpace(needle))
+                {
+                    friends = friends.Where(f =>
+                        (!string.IsNullOrWhiteSpace(f.Name) && f.Name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                        || (!string.IsNullOrWhiteSpace(f.Username) && f.Username.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0));
+                }
+
+                // Hide deleted conversations by default, but still allow finding via search.
+                if (string.IsNullOrWhiteSpace(needle))
+                {
+                    friends = friends.Where(f => !f.IsHidden);
+                }
+
+                foreach (var f in friends
+                             .OrderByDescending(f => f.IsPinned)
+                             .ThenByDescending(f => f.LastActivityUtc ?? DateTime.MinValue)
+                             .ThenBy(f => f.Name))
+                {
+                    SidebarItems.Add(f);
+                }
+
+                if (!string.IsNullOrWhiteSpace(_lastSelectedFriendUserId))
+                {
+                    var toSelect = SidebarItems.OfType<FriendItemViewModel>()
+                        .FirstOrDefault(x => string.Equals(x.UserId, _lastSelectedFriendUserId, StringComparison.Ordinal));
+                    if (toSelect != null)
+                    {
+                        SelectedSidebarItem = toSelect;
+                    }
+                }
+            }
+
+            // Default selection (per current section)
+            if (SelectedSidebarItem == null || !SidebarItems.Contains(SelectedSidebarItem))
+            {
+                SelectedSidebarItem = SidebarItems.FirstOrDefault();
+            }
+        }
+        finally
+        {
+            _suppressSidebarSelectionHandling = false;
         }
 
-        Friends.Clear();
-        foreach (var f in filtered)
+        // If filtering changed the selection and there's no matching open conversation, open it once.
+        if (SelectedSidebarItem != null && !SidebarItemMatchesSelectedConversation(SelectedSidebarItem, previousConversation))
         {
-            Friends.Add(f);
+            if (SelectedSidebarItem is FriendItemViewModel f)
+            {
+                _lastSelectedFriendUserId = f.UserId;
+                _ = OpenChatWithFriendAsync(f);
+            }
+            else if (SelectedSidebarItem is GroupChatItemViewModel g)
+            {
+                _lastSelectedGroupConversationId = g.ConversationId;
+                _ = OpenChatWithGroupAsync(g);
+            }
         }
     }
 
-    private async Task OpenChatWithFriendAsync(FriendItemViewModel? friend)
+    private bool SidebarItemMatchesSelectedConversation(object sidebarItem, ConversationItemViewModel? conversation)
     {
-        if (friend == null) return;
+        if (conversation == null) return false;
+        if (sidebarItem is GroupChatItemViewModel g)
+        {
+            return string.Equals(g.ConversationId, conversation.ConversationId, StringComparison.Ordinal);
+        }
 
+        if (sidebarItem is FriendItemViewModel f)
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId) || string.IsNullOrWhiteSpace(f.UserId)) return false;
+            string pairId = GetCanonicalPairId(currentUserId, f.UserId);
+            return string.Equals(pairId, conversation.ConversationId, StringComparison.Ordinal);
+        }
+
+        return false;
+    }
+
+    private async Task LoadGroupsAsync(string? selectConversationId = null)
+    {
         string? currentUserId = _authService.CurrentUserId;
         if (string.IsNullOrWhiteSpace(currentUserId)) return;
 
         try
         {
-            var conversationId = await _messagingService.GetOrCreateConversation(currentUserId, friend.UserId);
-            SelectedConversation = new ConversationItemViewModel
+            var raw = await _messagingService.GetConversations(currentUserId);
+
+            // Cache per-user conversation settings from raw results
+            _conversationSettings.Clear();
+            foreach (var d in raw)
             {
-                ConversationId = conversationId,
-                OtherUserId = friend.UserId,
-                Title = friend.Name,
-                Subtitle = string.Empty,
-                AvatarText = friend.AvatarText
-            };
+                string cid = d.TryGetValue("conversationId", out var cidObj) ? cidObj?.ToString() ?? string.Empty : string.Empty;
+                if (string.IsNullOrWhiteSpace(cid)) continue;
+                bool pinned = d.TryGetValue("userPinned", out var p) && p is bool pb && pb;
+                bool muted = d.TryGetValue("userMuted", out var m) && m is bool mb && mb;
+                bool hidden = d.TryGetValue("userHidden", out var h) && h is bool hb && hb;
+
+                DateTime? clearedAtUtc = null;
+                if (d.TryGetValue("userClearedAt", out var ca) && ca is Timestamp ts)
+                {
+                    clearedAtUtc = ts.ToDateTime().ToUniversalTime();
+                }
+
+                DateTime? lastActivityUtc = null;
+                if (d.TryGetValue("lastMessageAt", out var lma) && lma is Timestamp lts)
+                {
+                    lastActivityUtc = lts.ToDateTime().ToUniversalTime();
+                }
+                else if (d.TryGetValue("createdAt", out var cra) && cra is Timestamp cts)
+                {
+                    lastActivityUtc = cts.ToDateTime().ToUniversalTime();
+                }
+
+                _conversationSettings[cid] = (pinned, muted, hidden, clearedAtUtc, lastActivityUtc);
+            }
+
+            var groups = raw
+                .Where(d => d.TryGetValue("isGroup", out var isg) && isg is bool b && b)
+                .Select(d =>
+                {
+                    string id = d.TryGetValue("conversationId", out var cid) ? cid?.ToString() ?? string.Empty : string.Empty;
+                    string name = d.TryGetValue("groupName", out var gn) ? gn?.ToString() ?? "Nhóm chat" : "Nhóm chat";
+                    string avatarDataUrl = d.TryGetValue("groupAvatarDataUrl", out var au) ? au?.ToString() ?? string.Empty : string.Empty;
+
+                    bool pinned = d.TryGetValue("userPinned", out var p) && p is bool pb && pb;
+                    bool muted = d.TryGetValue("userMuted", out var m) && m is bool mb && mb;
+                    bool hidden = d.TryGetValue("userHidden", out var h) && h is bool hb && hb;
+
+                    DateTime? lastActivityUtc = null;
+                    if (d.TryGetValue("lastMessageAt", out var lma) && lma is Timestamp lts)
+                    {
+                        lastActivityUtc = lts.ToDateTime().ToUniversalTime();
+                    }
+                    else if (d.TryGetValue("createdAt", out var cra) && cra is Timestamp cts)
+                    {
+                        lastActivityUtc = cts.ToDateTime().ToUniversalTime();
+                    }
+
+                    var participants = new List<string>();
+                    if (d.TryGetValue("participants", out var pObj) && pObj is IEnumerable<string> ps)
+                    {
+                        participants = ps.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal).ToList();
+                    }
+
+                    var vm = new GroupChatItemViewModel
+                    {
+                        ConversationId = id,
+                        Name = name,
+                        AvatarText = string.IsNullOrWhiteSpace(name) ? "G" : name.Substring(0, 1).ToUpperInvariant(),
+                        AvatarImage = TryDecodeDataUrlToImageSource(string.IsNullOrWhiteSpace(avatarDataUrl) ? null : avatarDataUrl),
+                        ParticipantIds = participants,
+                        IsPinned = pinned,
+                        NotificationsEnabled = !muted,
+                        IsHidden = hidden,
+                        LastActivityUtc = lastActivityUtc
+                    };
+                    return vm;
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.ConversationId))
+                .ToList();
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                _allGroups.Clear();
+                _allGroups.AddRange(groups);
+
+                // Apply settings to friends now that we have fresh conversation settings
+                ApplyFriendConversationSettings();
+                ApplySidebarFilter();
+
+                if (!string.IsNullOrWhiteSpace(selectConversationId))
+                {
+                    var toSelect = _allGroups.FirstOrDefault(g => g.ConversationId == selectConversationId);
+                    if (toSelect != null)
+                    {
+                        SelectedSidebarItem = toSelect;
+                    }
+                }
+            });
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"OpenChatWithFriend failed: {ex.Message}");
+            Console.WriteLine($"LoadGroups failed: {ex.Message}");
         }
+    }
+
+    private void ApplyFriendConversationSettings()
+    {
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        foreach (var f in _allFriends)
+        {
+            if (string.IsNullOrWhiteSpace(f.UserId)) continue;
+
+            string convId = GetCanonicalPairId(currentUserId, f.UserId);
+            if (_conversationSettings.TryGetValue(convId, out var s))
+            {
+                f.IsPinned = s.pinned;
+                f.NotificationsEnabled = !s.muted;
+                f.IsHidden = s.hidden;
+                f.LastActivityUtc = s.lastActivityUtc;
+            }
+            else
+            {
+                // Default UI state if no conversation exists yet
+                f.IsPinned = false;
+                f.NotificationsEnabled = true;
+                f.IsHidden = false;
+                f.LastActivityUtc = null;
+            }
+        }
+    }
+
+    private static string GetCanonicalPairId(string userId1, string userId2)
+    {
+        if (string.CompareOrdinal(userId1, userId2) < 0)
+            return $"{userId1}_{userId2}";
+        return $"{userId2}_{userId1}";
+    }
+
+    private async Task<string?> ResolveConversationIdAsync(object? item)
+    {
+        if (item == null) return null;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return null;
+
+        if (item is GroupChatItemViewModel g)
+        {
+            return string.IsNullOrWhiteSpace(g.ConversationId) ? null : g.ConversationId;
+        }
+
+        if (item is FriendItemViewModel f)
+        {
+            if (string.IsNullOrWhiteSpace(f.UserId)) return null;
+            // Ensure conversation doc exists before updating settings.
+            return await _messagingService.GetOrCreateConversation(currentUserId, f.UserId);
+        }
+
+        return null;
+    }
+
+    private async Task TogglePinAsync(object? item)
+    {
+        if (item == null) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        try
+        {
+            bool newPinned;
+            if (item is GroupChatItemViewModel g)
+            {
+                newPinned = !g.IsPinned;
+                g.IsPinned = newPinned;
+            }
+            else if (item is FriendItemViewModel f)
+            {
+                newPinned = !f.IsPinned;
+                f.IsPinned = newPinned;
+            }
+            else
+            {
+                return;
+            }
+
+            var convId = await ResolveConversationIdAsync(item);
+            if (string.IsNullOrWhiteSpace(convId)) return;
+
+            await _messagingService.UpdateConversationUserSettings(convId, currentUserId, pinned: newPinned);
+
+            if (_conversationSettings.TryGetValue(convId, out var s))
+            {
+                _conversationSettings[convId] = (pinned: newPinned, s.muted, s.hidden, s.clearedAtUtc, s.lastActivityUtc);
+            }
+            ApplySidebarFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"TogglePin failed: {ex.Message}");
+        }
+    }
+
+    private async Task UpdatePinnedAsync(object? item)
+    {
+        if (item == null) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        try
+        {
+            bool pinned;
+            if (item is GroupChatItemViewModel g)
+            {
+                pinned = g.IsPinned;
+            }
+            else if (item is FriendItemViewModel f)
+            {
+                pinned = f.IsPinned;
+            }
+            else
+            {
+                return;
+            }
+
+            var convId = await ResolveConversationIdAsync(item);
+            if (string.IsNullOrWhiteSpace(convId)) return;
+
+            await _messagingService.UpdateConversationUserSettings(convId, currentUserId, pinned: pinned);
+            if (_conversationSettings.TryGetValue(convId, out var s))
+            {
+                _conversationSettings[convId] = (pinned: pinned, s.muted, s.hidden, s.clearedAtUtc, s.lastActivityUtc);
+            }
+            ApplySidebarFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"UpdatePinned failed: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateNotificationsAsync(object? item)
+    {
+        if (item == null) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        try
+        {
+            bool enabled;
+            if (item is GroupChatItemViewModel g)
+            {
+                enabled = g.NotificationsEnabled;
+            }
+            else if (item is FriendItemViewModel f)
+            {
+                enabled = f.NotificationsEnabled;
+            }
+            else
+            {
+                return;
+            }
+
+            bool muted = !enabled;
+
+            var convId = await ResolveConversationIdAsync(item);
+            if (string.IsNullOrWhiteSpace(convId)) return;
+
+            await _messagingService.UpdateConversationUserSettings(convId, currentUserId, muted: muted);
+
+            if (_conversationSettings.TryGetValue(convId, out var s))
+            {
+                _conversationSettings[convId] = (s.pinned, muted: muted, s.hidden, s.clearedAtUtc, s.lastActivityUtc);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"UpdateNotifications failed: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteConversationAsync(object? item)
+    {
+        if (item == null) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        var result = MessageBox.Show(
+            "Bạn có chắc chắn muốn xóa cuộc trò chuyện này không?\n(Lưu ý: thao tác này chỉ ẩn ở phía bạn)",
+            "Xóa cuộc trò chuyện",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            // Optimistically: hide and clear history for this user
+            if (item is GroupChatItemViewModel g)
+            {
+                g.IsHidden = true;
+                g.IsPinned = false;
+                g.NotificationsEnabled = true;
+            }
+            if (item is FriendItemViewModel f)
+            {
+                f.IsHidden = true;
+                f.IsPinned = false;
+                f.NotificationsEnabled = true;
+            }
+
+            var convId = await ResolveConversationIdAsync(item);
+            if (string.IsNullOrWhiteSpace(convId))
+            {
+                ApplySidebarFilter();
+                return;
+            }
+
+            await _messagingService.UpdateConversationUserSettings(convId, currentUserId, pinned: false, muted: false, hidden: true, clearHistory: true);
+
+            // Update local cache
+            _conversationSettings[convId] = (pinned: false, muted: false, hidden: true, clearedAtUtc: DateTime.UtcNow, lastActivityUtc: DateTime.UtcNow);
+
+            if (SelectedSidebarItem == item)
+            {
+                SelectedSidebarItem = null;
+                SelectedConversation = null;
+            }
+
+            ApplySidebarFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DeleteConversation failed: {ex.Message}");
+        }
+    }
+
+    private Task OpenChatWithFriendAsync(FriendItemViewModel? friend)
+    {
+        if (friend == null) return Task.CompletedTask;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return Task.CompletedTask;
+
+        // Open immediately using canonical id (avoid network roundtrip on click).
+        var conversationId = GetCanonicalPairId(currentUserId, friend.UserId);
+        SelectedConversation = new ConversationItemViewModel
+        {
+            ConversationId = conversationId,
+            OtherUserId = friend.UserId,
+            Title = friend.Name,
+            Subtitle = string.Empty,
+            AvatarText = friend.AvatarText
+        };
+
+        // Background: ensure conversation exists and revive if previously hidden.
+        _ = EnsureFriendConversationExistsAndReviveAsync(friend, currentUserId, conversationId);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task EnsureFriendConversationExistsAndReviveAsync(FriendItemViewModel friend, string currentUserId, string conversationId)
+    {
+        try
+        {
+            // Ensure conversation document exists (id is deterministic).
+            await _messagingService.GetOrCreateConversation(currentUserId, friend.UserId);
+
+            if (!friend.IsHidden) return;
+
+            friend.IsHidden = false;
+            await _messagingService.UpdateConversationUserSettings(conversationId, currentUserId, hidden: false);
+            if (_conversationSettings.TryGetValue(conversationId, out var s))
+            {
+                _conversationSettings[conversationId] = (s.pinned, s.muted, hidden: false, s.clearedAtUtc, s.lastActivityUtc);
+            }
+            ApplySidebarFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"EnsureFriendConversationExistsAndRevive failed: {ex.Message}");
+        }
+    }
+
+    private Task OpenChatWithGroupAsync(GroupChatItemViewModel? group)
+    {
+        if (group == null) return Task.CompletedTask;
+
+        bool needsSidebarRefresh = false;
+
+        // If the user explicitly opens a hidden group via search, revive it.
+        if (group.IsHidden)
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (!string.IsNullOrWhiteSpace(currentUserId))
+            {
+                group.IsHidden = false;
+                _ = _messagingService.UpdateConversationUserSettings(group.ConversationId, currentUserId, hidden: false);
+                if (_conversationSettings.TryGetValue(group.ConversationId, out var s))
+                {
+                    _conversationSettings[group.ConversationId] = (s.pinned, s.muted, hidden: false, s.clearedAtUtc, s.lastActivityUtc);
+                }
+                needsSidebarRefresh = true;
+            }
+        }
+
+        SelectedConversation = new ConversationItemViewModel
+        {
+            ConversationId = group.ConversationId,
+            OtherUserId = string.Empty,
+            Title = group.Name,
+            Subtitle = string.Empty,
+            AvatarText = group.AvatarText,
+            AvatarImage = group.AvatarImage,
+            IsGroup = true,
+            ParticipantIds = group.ParticipantIds
+        };
+
+        if (needsSidebarRefresh)
+        {
+            ApplySidebarFilter();
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task SwitchConversationAsync(ConversationItemViewModel? conversation)
     {
-        _messageListener?.StopAsync();
-        _messageListener = null;
+        if (_messageListener != null)
+        {
+            try
+            {
+                await _messageListener.StopAsync();
+            }
+            catch { }
+            _messageListener = null;
+        }
 
-        Application.Current.Dispatcher.Invoke(() =>
+        string? targetConversationId = conversation?.ConversationId;
+
+        _ = Application.Current.Dispatcher.BeginInvoke(() =>
         {
             Messages.Clear();
             Members.Clear();
+
+            if (!string.IsNullOrWhiteSpace(targetConversationId)
+                && _messageCache.TryGetValue(targetConversationId, out var cached)
+                && cached.Count > 0)
+            {
+                foreach (var vm in cached)
+                {
+                    Messages.Add(vm);
+                }
+            }
         });
 
         _locallyHiddenMessageIds.Clear();
@@ -228,27 +859,46 @@ public sealed class MainViewModel : ObservableObject
         string? currentUserId = _authService.CurrentUserId;
         if (string.IsNullOrWhiteSpace(currentUserId)) return;
 
-        // Members (basic for 1-1 chat)
+        // Members
         Application.Current.Dispatcher.Invoke(() =>
         {
-            Members.Add(new MemberItemViewModel { Name = "Bạn", AvatarText = "B" });
-            if (!string.IsNullOrWhiteSpace(conversation.Title))
+            Members.Clear();
+
+            if (conversation.IsGroup && conversation.ParticipantIds.Count > 0)
             {
-                Members.Add(new MemberItemViewModel { Name = conversation.Title, AvatarText = conversation.AvatarText });
+                foreach (var uid in conversation.ParticipantIds.Distinct(StringComparer.Ordinal))
+                {
+                    if (string.IsNullOrWhiteSpace(uid)) continue;
+
+                    if (string.Equals(uid, currentUserId, StringComparison.Ordinal))
+                    {
+                        Members.Add(new MemberItemViewModel { Name = "Bạn", AvatarText = "B" });
+                        continue;
+                    }
+
+                    var friend = _allFriends.FirstOrDefault(f => string.Equals(f.UserId, uid, StringComparison.Ordinal));
+                    string name = friend?.Name ?? uid;
+                    string avatarText = friend?.AvatarText ?? (string.IsNullOrWhiteSpace(name) ? "?" : name.Substring(0, 1).ToUpperInvariant());
+                    Members.Add(new MemberItemViewModel { Name = name, AvatarText = avatarText });
+                }
+            }
+            else
+            {
+                Members.Add(new MemberItemViewModel { Name = "Bạn", AvatarText = "B" });
+                if (!string.IsNullOrWhiteSpace(conversation.Title))
+                {
+                    Members.Add(new MemberItemViewModel { Name = conversation.Title, AvatarText = conversation.AvatarText });
+                }
             }
         });
 
         try
         {
-            // Initial load
-            var raw = await _messagingService.GetMessages(conversation.ConversationId);
-            ApplyMessages(raw, currentUserId);
-
-            // Realtime listener
+            // Realtime listener (will deliver an initial snapshot as well)
             _messageListener = _messagingService.ListenToMessages(conversation.ConversationId, msgs =>
             {
                 if (string.IsNullOrWhiteSpace(_authService.CurrentUserId)) return;
-                ApplyMessages(msgs, _authService.CurrentUserId);
+                ApplyMessages(conversation.ConversationId, msgs, _authService.CurrentUserId);
             });
 
             await _messagingService.MarkMessagesAsRead(conversation.ConversationId, currentUserId);
@@ -259,14 +909,47 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private void ApplyMessages(List<Dictionary<string, object>> rawMessages, string currentUserId)
+    private void ApplyMessages(string conversationId, List<Dictionary<string, object>> rawMessages, string currentUserId)
     {
+        DateTime? clearedAtUtc = null;
+        if (!string.IsNullOrWhiteSpace(conversationId)
+            && _conversationSettings.TryGetValue(conversationId, out var s)
+            && s.clearedAtUtc.HasValue)
+        {
+            clearedAtUtc = s.clearedAtUtc.Value;
+        }
+
         // Sort by timestamp ascending
         var ordered = rawMessages
             .Select(m => new { m, t = ExtractTimestamp(m) })
             .OrderBy(x => x.t)
             .Select(x => x.m)
             .ToList();
+
+        if (clearedAtUtc.HasValue)
+        {
+            ordered = ordered
+                .Where(m =>
+                {
+                    var ts = ExtractTimestamp(m);
+                    if (ts == DateTime.MinValue) return true;
+                    return ts.ToUniversalTime() > clearedAtUtc.Value;
+                })
+                .ToList();
+        }
+
+        // Update last activity so the sidebar reorders by recent messages.
+        var latest = ordered
+            .Select(ExtractTimestamp)
+            .Where(d => d != DateTime.MinValue)
+            .Select(d => d.ToUniversalTime())
+            .DefaultIfEmpty(DateTime.MinValue)
+            .Max();
+
+        if (latest != DateTime.MinValue)
+        {
+            BumpConversationActivity(conversationId, latest, currentUserId);
+        }
 
         var viewModels = ordered
             .Where(m => m.ContainsKey("senderId") && m.ContainsKey("content"))
@@ -302,10 +985,22 @@ public sealed class MainViewModel : ObservableObject
                         break;
                     case "link":
                         // Backward compatibility if old messages were stored with type=link.
-                        vm.Kind = MessageBubbleKind.Link;
-                        vm.LinkText = content;
-                        vm.LinkUri = TryCreateHttpUri(content);
-                        break;
+                        {
+                            var trimmedLink = (content ?? string.Empty).Trim();
+                            var linkUri = TryCreateHttpUri(trimmedLink);
+                            if (linkUri != null)
+                            {
+                                vm.Kind = MessageBubbleKind.Link;
+                                vm.LinkText = trimmedLink;
+                                vm.LinkUri = linkUri;
+                            }
+                            else
+                            {
+                                vm.Kind = MessageBubbleKind.Text;
+                                vm.Text = content ?? string.Empty;
+                            }
+                            break;
+                        }
                     default:
                         // Treat pure URL as a clickable link without needing a separate "send link" feature.
                         var trimmed = content.Trim();
@@ -319,7 +1014,7 @@ public sealed class MainViewModel : ObservableObject
                         else
                         {
                             vm.Kind = MessageBubbleKind.Text;
-                            vm.Text = content;
+                            vm.Text = content ?? string.Empty;
                         }
                         break;
                 }
@@ -331,12 +1026,115 @@ public sealed class MainViewModel : ObservableObject
 
         Application.Current.Dispatcher.BeginInvoke(() =>
         {
-            Messages.Clear();
-            foreach (var vm in viewModels)
-            {
-                Messages.Add(vm);
-            }
+            SyncMessagesIncremental(viewModels);
+            _messageCache[conversationId] = Messages.ToList();
         });
+    }
+
+    private void SyncMessagesIncremental(List<MessageItemViewModel> newItems)
+    {
+        // Fast-path: if nothing exists yet, add all.
+        if (Messages.Count == 0)
+        {
+            foreach (var vm in newItems) Messages.Add(vm);
+            return;
+        }
+
+        // Drop trailing optimistic messages before comparing with server snapshot.
+        int optimisticCount = 0;
+        for (int i = Messages.Count - 1; i >= 0; i--)
+        {
+            var id = Messages[i].MessageId ?? string.Empty;
+            if (!id.StartsWith("local-", StringComparison.Ordinal)) break;
+            optimisticCount++;
+        }
+
+        int trimmedCount = Messages.Count - optimisticCount;
+        if (trimmedCount < 0) trimmedCount = 0;
+
+        bool isPrefix = trimmedCount <= newItems.Count;
+        if (isPrefix)
+        {
+            for (int i = 0; i < trimmedCount; i++)
+            {
+                if (!string.Equals(Messages[i].MessageId, newItems[i].MessageId, StringComparison.Ordinal))
+                {
+                    isPrefix = false;
+                    break;
+                }
+            }
+        }
+
+        if (isPrefix)
+        {
+            // Remove optimistic tail (server snapshot now becomes source of truth)
+            while (Messages.Count > trimmedCount)
+            {
+                Messages.RemoveAt(Messages.Count - 1);
+            }
+
+            // Append any new server messages
+            for (int i = trimmedCount; i < newItems.Count; i++)
+            {
+                Messages.Add(newItems[i]);
+            }
+            return;
+        }
+
+        // Fallback: replace all (handles revoke/delete/edits/out-of-order snapshots)
+        Messages.Clear();
+        foreach (var vm in newItems)
+        {
+            Messages.Add(vm);
+        }
+    }
+
+    private void BumpConversationActivity(string conversationId, DateTime lastActivityUtc, string currentUserId)
+    {
+        if (string.IsNullOrWhiteSpace(conversationId)) return;
+
+        if (_conversationSettings.TryGetValue(conversationId, out var s))
+        {
+            _conversationSettings[conversationId] = (s.pinned, s.muted, s.hidden, s.clearedAtUtc, lastActivityUtc);
+        }
+        else
+        {
+            _conversationSettings[conversationId] = (pinned: false, muted: false, hidden: false, clearedAtUtc: null, lastActivityUtc: lastActivityUtc);
+        }
+
+        Application.Current.Dispatcher.BeginInvoke(() =>
+        {
+            // Group
+            var g = _allGroups.FirstOrDefault(x => string.Equals(x.ConversationId, conversationId, StringComparison.Ordinal));
+            if (g != null)
+            {
+                g.LastActivityUtc = lastActivityUtc;
+                ApplySidebarFilter();
+                return;
+            }
+
+            // Friend (canonical pair id)
+            string other = TryGetOtherUserIdFromPairId(conversationId, currentUserId) ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(other))
+            {
+                var f = _allFriends.FirstOrDefault(x => string.Equals(x.UserId, other, StringComparison.Ordinal));
+                if (f != null)
+                {
+                    f.LastActivityUtc = lastActivityUtc;
+                }
+            }
+            ApplySidebarFilter();
+        });
+    }
+
+    private static string? TryGetOtherUserIdFromPairId(string conversationId, string currentUserId)
+    {
+        if (string.IsNullOrWhiteSpace(conversationId) || string.IsNullOrWhiteSpace(currentUserId)) return null;
+        var parts = conversationId.Split('_');
+        if (parts.Length != 2) return null;
+        if (string.Equals(parts[0], currentUserId, StringComparison.Ordinal)) return parts[1];
+        if (string.Equals(parts[1], currentUserId, StringComparison.Ordinal)) return parts[0];
+        return null;
     }
 
     private async Task RevokeMessageAsync(MessageItemViewModel? msg)
@@ -439,19 +1237,58 @@ public sealed class MainViewModel : ObservableObject
         string? currentUserId = _authService.CurrentUserId;
         if (string.IsNullOrWhiteSpace(currentUserId)) return;
 
+        // Optimistic UI: show the outgoing message immediately.
+        var tempId = $"local-{Guid.NewGuid():N}";
+        var optimisticVm = new MessageItemViewModel
+        {
+            MessageId = tempId,
+            SenderId = currentUserId,
+            IsOutgoing = true,
+            Time = DateTime.Now,
+            SenderAvatarText = "B",
+            Kind = MessageBubbleKind.Text,
+            Text = text
+        };
+
+        _pendingOutgoingByTempId[tempId] = DateTime.UtcNow;
+
+        await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            Messages.Add(optimisticVm);
+            if (!string.IsNullOrWhiteSpace(selected.ConversationId))
+            {
+                _messageCache[selected.ConversationId] = Messages.ToList();
+            }
+        });
+
+        DraftMessage = string.Empty;
+
         try
         {
             var (success, message) = await _messagingService.SendMessage(selected.ConversationId, currentUserId, text);
             if (!success)
             {
                 Console.WriteLine(message);
+                // Roll back optimistic message if send failed.
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    var existing = Messages.FirstOrDefault(m => string.Equals(m.MessageId, tempId, StringComparison.Ordinal));
+                    if (existing != null) Messages.Remove(existing);
+                });
                 return;
             }
-            DraftMessage = string.Empty;
+
+            // Move conversation to top immediately (pinned still stays above).
+            BumpConversationActivity(selected.ConversationId, DateTime.UtcNow, currentUserId);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"SendMessage failed: {ex.Message}");
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var existing = Messages.FirstOrDefault(m => string.Equals(m.MessageId, tempId, StringComparison.Ordinal));
+                if (existing != null) Messages.Remove(existing);
+            });
         }
     }
 
@@ -584,28 +1421,47 @@ public sealed class MainViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
         string trimmed = input.Trim();
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+
+        // Don't auto-linkify phrases.
+        if (trimmed.Any(char.IsWhiteSpace)) return null;
+
+        // Trim common trailing punctuation from sentences.
+        trimmed = trimmed.TrimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '"', '\'');
+        if (string.IsNullOrWhiteSpace(trimmed)) return null;
+
+        // If it's already an absolute URL, validate scheme.
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
         {
-            // Allow users to type "google.com" without scheme.
-            if (!trimmed.Contains("://", StringComparison.OrdinalIgnoreCase)
-                && Uri.TryCreate("https://" + trimmed, UriKind.Absolute, out var uri2))
+            if (string.Equals(absolute.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(absolute.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             {
-                uri = uri2;
+                return absolute;
             }
-            else
-            {
-                return null;
-            }
-        }
-        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-        {
             return null;
         }
-        return uri;
+
+        // If there's no scheme, only auto-add one for domain-like strings.
+        // This prevents single words like "alo" becoming https://alo.
+        bool looksLikeDomain = trimmed.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
+                               || trimmed.Contains('.', StringComparison.Ordinal)
+                               || string.Equals(trimmed, "localhost", StringComparison.OrdinalIgnoreCase);
+
+        if (!looksLikeDomain) return null;
+
+        if (!trimmed.Contains("://", StringComparison.OrdinalIgnoreCase)
+            && Uri.TryCreate("https://" + trimmed, UriKind.Absolute, out var withScheme))
+        {
+            if (string.Equals(withScheme.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(withScheme.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                return withScheme;
+            }
+        }
+
+        return null;
     }
 
-    private static ImageSource? TryDecodeDataUrlToImageSource(string dataUrl)
+    private static ImageSource? TryDecodeDataUrlToImageSource(string? dataUrl)
     {
         try
         {

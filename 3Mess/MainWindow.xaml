@@ -22,6 +22,10 @@
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
 
+        <Style x:Key="BlueSidebarCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Background" Value="#FFEEF2FF" />
+        </Style>
+
         <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="44" />
@@ -41,6 +45,50 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="RightSidebarCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Background" Value="#FFEEF2FF" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
+        <Style x:Key="RightSidebarIconButton" TargetType="Button">
+            <Setter Property="Height" Value="52" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="#FFFFFFFF" />
+            <Setter Property="BorderBrush" Value="#FFBFDBFE" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="999">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.92" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.6" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RightSidebarPillHeader" TargetType="Border">
+            <Setter Property="Background" Value="#FFDBEAFE" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="BorderBrush" Value="#FFBFDBFE" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
 
         <Style x:Key="PrimarySendButton" TargetType="Button">
@@ -66,11 +114,75 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="SidebarMoreButton" TargetType="ToggleButton">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsMouseOver}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.9" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SmallSwitch" TargetType="ToggleButton">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="#FFE5E7EB" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+                            <Border CornerRadius="10" Background="{TemplateBinding Background}" />
+                            <Border x:Name="Knob" Width="16" Height="16" CornerRadius="8" Background="White" Margin="2" HorizontalAlignment="Left" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background" Value="#FF2563EB" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MenuRow" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFF3F4F6" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <DataTemplate DataType="{x:Type vm:FriendItemViewModel}">
             <Grid Margin="6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="48" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
 
                 <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
@@ -79,9 +191,194 @@
                 </Border>
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                    <DockPanel LastChildFill="True">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                        <TextBlock DockPanel.Dock="Right"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   Text="&#xE840;"
+                                   FontSize="12"
+                                   Foreground="#FF2563EB"
+                                   Margin="6,1,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </DockPanel>
                     <TextBlock Text="{Binding Status}" Foreground="#FF6B7280" FontSize="12" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
+
+                <Grid Grid.Column="2" VerticalAlignment="Center">
+                    <ToggleButton x:Name="MoreBtn" Style="{StaticResource SidebarMoreButton}" ToolTip="Tùy chọn">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="16" Foreground="#FFEF4444" />
+                    </ToggleButton>
+                    <Popup Placement="Bottom" PlacementTarget="{Binding ElementName=MoreBtn}"
+                           IsOpen="{Binding IsChecked, ElementName=MoreBtn, Mode=TwoWay}"
+                           StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="10" Padding="10">
+                            <StackPanel Width="230">
+                                <Border Style="{StaticResource MenuRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Ghim" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                      IsChecked="{Binding IsPinned, Mode=TwoWay}"
+                                                      Command="{Binding DataContext.UpdatePinnedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource MenuRow}" Margin="0,6,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Thông báo" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                      IsChecked="{Binding NotificationsEnabled, Mode=TwoWay}"
+                                                      Command="{Binding DataContext.UpdateNotificationsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Height="1" Background="#FFE5E7EB" Margin="0,8" />
+
+                                <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch" Padding="0"
+                                        Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}">
+                                    <Border Style="{StaticResource MenuRow}">
+                                        <TextBlock Text="Xóa cuộc trò chuyện" FontSize="14" FontWeight="SemiBold" Foreground="#FFEF4444" />
+                                    </Border>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type vm:GroupChatItemViewModel}">
+            <Grid Margin="6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="28" />
+                </Grid.ColumnDefinitions>
+
+                <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                    <Grid>
+                        <Image Source="{Binding AvatarImage}" Stretch="UniformToFill">
+                            <Image.Style>
+                                <Style TargetType="Image">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Image.Style>
+                        </Image>
+                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                        <TextBlock DockPanel.Dock="Right"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   Text="&#xE840;"
+                                   FontSize="12"
+                                   Foreground="#FF2563EB"
+                                   Margin="6,1,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </DockPanel>
+                    <TextBlock Text="Nhóm" Foreground="#FF6B7280" FontSize="12" />
+                </StackPanel>
+
+                <Grid Grid.Column="2" VerticalAlignment="Center">
+                    <ToggleButton x:Name="MoreBtnG" Style="{StaticResource SidebarMoreButton}" ToolTip="Tùy chọn">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="16" Foreground="#FFEF4444" />
+                    </ToggleButton>
+                    <Popup Placement="Bottom" PlacementTarget="{Binding ElementName=MoreBtnG}"
+                           IsOpen="{Binding IsChecked, ElementName=MoreBtnG, Mode=TwoWay}"
+                           StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="10" Padding="10">
+                            <StackPanel Width="230">
+                                <Border Style="{StaticResource MenuRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Ghim" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                      IsChecked="{Binding IsPinned, Mode=TwoWay}"
+                                                      Command="{Binding DataContext.UpdatePinnedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource MenuRow}" Margin="0,6,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Thông báo" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                      IsChecked="{Binding NotificationsEnabled, Mode=TwoWay}"
+                                                      Command="{Binding DataContext.UpdateNotificationsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                      CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Height="1" Background="#FFE5E7EB" Margin="0,8" />
+
+                                <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch" Padding="0"
+                                        Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}">
+                                    <Border Style="{StaticResource MenuRow}">
+                                        <TextBlock Text="Xóa cuộc trò chuyện" FontSize="14" FontWeight="SemiBold" Foreground="#FFEF4444" />
+                                    </Border>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
             </Grid>
         </DataTemplate>
 
@@ -92,13 +389,13 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
-                <Border Width="32" Height="32" CornerRadius="16" Background="#FFE5E7EB" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                <Border Width="32" Height="32" CornerRadius="16" Background="#FFDBEAFE" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF1E3A8A"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#FF111827" />
-                <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="28" Height="28" Margin="0" Background="#FFF9FAFB">
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="12" Foreground="#FF6B7280" />
+                <Button Grid.Column="2" Width="28" Height="28" Margin="0" Background="Transparent" BorderThickness="0" Cursor="Hand">
+                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="14" Foreground="#FF6B7280" />
                 </Button>
             </Grid>
         </DataTemplate>
@@ -179,7 +476,7 @@
                                     CornerRadius="12"
                                     Padding="10"
                                     Margin="0,0,0,6">
-                                <TextBlock TextWrapping="Wrap">
+                                <TextBlock TextWrapping="Wrap" FontSize="15">
                                     <Hyperlink NavigateUri="{Binding LinkUri}"
                                                RequestNavigate="Hyperlink_RequestNavigate"
                                                Foreground="White">
@@ -282,7 +579,7 @@
             </Grid.RowDefinitions>
 
             <!-- Left: friends -->
-            <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0">
+            <Border Grid.Column="0" Style="{StaticResource BlueSidebarCard}" Margin="0,0,12,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -290,11 +587,61 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Bạn bè" FontWeight="SemiBold" Foreground="#FF111827" Margin="2,0,0,10" />
+                    <Grid Margin="2,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Content="Bạn bè"
+                                Command="{Binding ShowFriendsCommand}"
+                                Background="Transparent" BorderThickness="0" Padding="0"
+                                HorizontalAlignment="Left" Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Foreground" Value="#FF6B7280" />
+                                    <Setter Property="FontWeight" Value="Normal" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowGroups}" Value="False">
+                                            <Setter Property="Foreground" Value="#FF111827" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <Button Grid.Column="1" Content="Nhóm"
+                                Command="{Binding ShowGroupsCommand}"
+                                Background="Transparent" BorderThickness="0" Padding="0"
+                                HorizontalAlignment="Right" Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="Foreground" Value="#FF6B7280" />
+                                    <Setter Property="FontWeight" Value="Normal" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowGroups}" Value="True">
+                                            <Setter Property="Foreground" Value="#FF111827" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
 
                     <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="10" BorderBrush="#FFE5E7EB" BorderThickness="1">
                         <DockPanel LastChildFill="True">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="#FF6B7280" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <Button DockPanel.Dock="Right"
+                                    Width="28" Height="28" Margin="8,0,0,0"
+                                    Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                                    Cursor="Hand"
+                                    ToolTip="Tạo group chat"
+                                    Command="{Binding OpenCreateGroupCommand}">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE710;" FontSize="12" Foreground="#FF6B7280"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Button>
                             <TextBox Style="{StaticResource WatermarkTextBox}" Tag="Tìm kiếm"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                      BorderThickness="0" Background="Transparent" Foreground="#FF111827"
@@ -303,7 +650,7 @@
                     </Border>
 
                     <ListBox Grid.Row="2" Margin="0,12,0,0"
-                             ItemsSource="{Binding Friends}" SelectedItem="{Binding SelectedFriend}"
+                             ItemsSource="{Binding SidebarItems}" SelectedItem="{Binding SelectedSidebarItem}"
                              BorderThickness="0" Background="Transparent"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Hidden">
@@ -345,10 +692,46 @@
                     <!-- Header -->
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}" FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
-                                   VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                        <Border Width="36" Height="36" CornerRadius="18" Background="#FFE5E7EB" VerticalAlignment="Center" Margin="6,0,10,0">
+                            <Grid>
+                                <Image Source="{Binding SelectedConversation.AvatarImage}" Stretch="UniformToFill">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedConversation.AvatarImage}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
+                                <TextBlock Text="{Binding SelectedConversation.AvatarText, FallbackValue=?}"
+                                           FontWeight="SemiBold" Foreground="#FF111827"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedConversation.AvatarImage}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Grid.Column="1" Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}" FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
+                                   VerticalAlignment="Center" HorizontalAlignment="Left" TextTrimming="CharacterEllipsis" />
+
+                        <TextBlock Grid.Column="2" Text="" />
                     </Grid>
 
                     <!-- Messages -->
@@ -401,48 +784,120 @@
                 </Grid>
             </Border>
 
-            <!-- Right: actions + members + docs -->
-            <Border Grid.Column="2" Style="{StaticResource Card}">
+            <!-- Right: actions + members + docs (dark) -->
+            <Border Grid.Column="2" Style="{StaticResource RightSidebarCard}">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- Actions -->
-                    <DockPanel>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                            <Button Style="{StaticResource IconButton}" Margin="0,0,10,10">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="18" Foreground="#FF111827" />
-                            </Button>
-                            <Button Style="{StaticResource IconButton}" Margin="0,0,10,10">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7ED;" FontSize="18" Foreground="#FF111827" />
-                            </Button>
-                            <Button Style="{StaticResource IconButton}" Margin="0,0,10,10">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="18" Foreground="#FF111827" />
-                            </Button>
-                        </StackPanel>
-                        <Border DockPanel.Dock="Right" Width="44" Height="44" CornerRadius="22" Background="#FFE5E7EB" Margin="0,0,0,10">
+                    <!-- Top icons (4 slots: 3 buttons + avatar) -->
+                    <UniformGrid Columns="4" Margin="0,0,0,10">
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7ED;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                        <Border Height="52" Background="#FFF9FAFB" CornerRadius="999">
                             <TextBlock Text="U" FontWeight="SemiBold" Foreground="#FF111827" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                    </DockPanel>
+                    </UniformGrid>
 
-                    <TextBlock Grid.Row="1" Text="Thành viên" FontWeight="SemiBold" Foreground="#FF111827" Margin="0,4,0,10" />
-                    <ListBox Grid.Row="2" ItemsSource="{Binding Members}" BorderThickness="0" Background="Transparent" />
+                    <!-- Second icons row (4 buttons) -->
+                    <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,14">
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE717;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE902;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                        <Button Style="{StaticResource RightSidebarIconButton}">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE840;" FontSize="20" Foreground="#FF111827" />
+                        </Button>
+                    </UniformGrid>
 
-                    <StackPanel Grid.Row="3" Margin="0,10,0,0">
-                        <TextBlock Text="Tài liệu" FontWeight="SemiBold" Foreground="#FF111827" Margin="0,0,0,8" />
-                        <Expander Header="Hình ảnh &amp; Video" IsExpanded="True" Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="8">
-                            <TextBlock Foreground="#FF6B7280" FontSize="12" Text="(demo)" />
-                        </Expander>
-                        <Expander Header="Tài liệu" IsExpanded="False" Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="8" Margin="0,8,0,0">
-                            <TextBlock Foreground="#FF6B7280" FontSize="12" Text="(demo)" />
-                        </Expander>
-                        <Expander Header="Liên kết" IsExpanded="False" Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="8" Margin="0,8,0,0">
-                            <TextBlock Foreground="#FF6B7280" FontSize="12" Text="(demo)" />
-                        </Expander>
+                    <!-- Members header -->
+                    <Border Grid.Row="2" Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
+                        <TextBlock Text="Thành viên" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    </Border>
+
+                    <!-- Members list -->
+                    <ListBox Grid.Row="3" ItemsSource="{Binding Members}" BorderThickness="0" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,0,8" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border CornerRadius="12" Background="#FFFFFFFF" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="8">
+                                                <ContentPresenter />
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+
+                    <!-- Docs section -->
+                    <StackPanel Grid.Row="4" Margin="0,12,0,0">
+                        <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
+                            <TextBlock Text="Tài liệu" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        </Border>
+
+                        <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Hình ảnh &amp; Video" Foreground="#FF111827" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE70D;" Foreground="#FF6B7280" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <UniformGrid Columns="3" Margin="0,10,0,0">
+                            <Border Height="56" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" Margin="0,0,8,0" />
+                            <Border Height="56" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" Margin="0,0,8,0" />
+                            <Border Height="56" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" />
+                        </UniformGrid>
+
+                        <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Tài liệu" Foreground="#FF111827" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" Foreground="#FF6B7280" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Liên kết" Foreground="#FF111827" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" Foreground="#FF6B7280" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Grid>
             </Border>

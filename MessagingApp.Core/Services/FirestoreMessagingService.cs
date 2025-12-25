@@ -77,9 +77,10 @@ namespace MessagingApp.Services
             {
                 var conversations = new List<Dictionary<string, object>>();
 
+                // Avoid composite-index requirements by not ordering server-side.
+                // We'll sort client-side using lastMessageAt/createdAt when available.
                 var query = _db.Collection("conversations")
-                    .WhereArrayContains("participants", userId)
-                    .OrderByDescending("lastMessageAt");
+                    .WhereArrayContains("participants", userId);
 
                 var snapshot = await query.GetSnapshotAsync();
 
@@ -88,29 +89,206 @@ namespace MessagingApp.Services
                     var convData = doc.ToDictionary();
                     convData["conversationId"] = doc.Id;
 
-                    // Get other participant's info
-                    var participants = doc.GetValue<List<object>>("participants");
-                    string otherUserId = participants.First(p => p.ToString() != userId).ToString()!;
-
-                    var userDoc = await _db.Collection("users").Document(otherUserId).GetSnapshotAsync();
-                    if (userDoc.Exists)
+                    // Per-user settings (pinned / muted / hidden)
+                    try
                     {
-                        convData["otherUserName"] = userDoc.GetValue<string>("fullName");
-                        convData["otherUsername"] = userDoc.GetValue<string>("username");
-                        convData["otherUserStatus"] = userDoc.GetValue<string>("status");
-                        convData["otherUserId"] = otherUserId;
+                        if (doc.ContainsField("userSettings"))
+                        {
+                            var settingsRoot = doc.GetValue<Dictionary<string, object>>("userSettings");
+                            if (settingsRoot != null
+                                && settingsRoot.TryGetValue(userId, out var settingsObj)
+                                && settingsObj is Dictionary<string, object> settings)
+                            {
+                                bool pinned = settings.TryGetValue("pinned", out var p) && p is bool pb && pb;
+                                bool muted = settings.TryGetValue("muted", out var m) && m is bool mb && mb;
+                                bool hidden = settings.TryGetValue("hidden", out var h) && h is bool hb && hb;
+
+                                Timestamp? clearedAt = null;
+                                try
+                                {
+                                    if (settings.TryGetValue("clearedAt", out var c) && c is Timestamp ts)
+                                    {
+                                        clearedAt = ts;
+                                    }
+                                }
+                                catch { }
+
+                                convData["userPinned"] = pinned;
+                                convData["userMuted"] = muted;
+                                convData["userHidden"] = hidden;
+                                if (clearedAt != null)
+                                {
+                                    convData["userClearedAt"] = clearedAt;
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // ignore settings parsing errors
+                    }
+
+                    // Always include participants (for group rendering)
+                    List<string> participantsStr;
+                    try
+                    {
+                        var participants = doc.GetValue<List<object>>("participants");
+                        participantsStr = participants.Select(p => p?.ToString() ?? string.Empty)
+                            .Where(s => !string.IsNullOrWhiteSpace(s))
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+                    }
+                    catch
+                    {
+                        participantsStr = new List<string>();
+                    }
+                    convData["participants"] = participantsStr;
+
+                    bool isGroup = false;
+                    try
+                    {
+                        if (doc.ContainsField("isGroup"))
+                        {
+                            isGroup = doc.GetValue<bool>("isGroup");
+                        }
+                        else if (participantsStr.Count > 2)
+                        {
+                            isGroup = true;
+                        }
+                    }
+                    catch { }
+
+                    if (isGroup)
+                    {
+                        convData["isGroup"] = true;
+                        convData["groupName"] = doc.ContainsField("groupName") ? doc.GetValue<string>("groupName") : "Nhóm chat";
+                        if (doc.ContainsField("groupAvatarDataUrl"))
+                        {
+                            convData["groupAvatarDataUrl"] = doc.GetValue<string>("groupAvatarDataUrl");
+                        }
+                        convData["memberCount"] = participantsStr.Count;
+                        conversations.Add(convData);
+                        continue;
+                    }
+                    convData["isGroup"] = false;
+
+                    // Get other participant's info
+                    if (participantsStr.Count >= 2)
+                    {
+                        string otherUserId = participantsStr.FirstOrDefault(p => !string.Equals(p, userId, StringComparison.Ordinal)) ?? string.Empty;
+                        if (!string.IsNullOrWhiteSpace(otherUserId))
+                        {
+                            var userDoc = await _db.Collection("users").Document(otherUserId).GetSnapshotAsync();
+                            if (userDoc.Exists)
+                            {
+                                convData["otherUserName"] = userDoc.ContainsField("fullName") ? userDoc.GetValue<string>("fullName") : string.Empty;
+                                convData["otherUsername"] = userDoc.ContainsField("username") ? userDoc.GetValue<string>("username") : string.Empty;
+                                convData["otherUserStatus"] = userDoc.ContainsField("status") ? userDoc.GetValue<string>("status") : "offline";
+                                convData["otherUserId"] = otherUserId;
+                            }
+                        }
                     }
 
                     conversations.Add(convData);
                 }
 
-                return conversations;
+                // Client-side sort (desc) by lastMessageAt, then createdAt.
+                // Missing timestamps sort to the end.
+                static Timestamp? TryGetTs(Dictionary<string, object> d, string key)
+                {
+                    if (!d.TryGetValue(key, out var v) || v == null) return null;
+                    if (v is Timestamp ts) return ts;
+                    return null;
+                }
+
+                return conversations
+                    .OrderByDescending(d => TryGetTs(d, "lastMessageAt") ?? TryGetTs(d, "createdAt") ?? Timestamp.FromDateTime(DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc)))
+                    .ToList();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting conversations: {ex.Message}");
                 return new List<Dictionary<string, object>>();
             }
+        }
+
+        /// <summary>
+        /// Update per-user conversation settings. This is used for pin/mute/hide without affecting other participants.
+        /// </summary>
+        public async Task UpdateConversationUserSettings(
+            string conversationId,
+            string userId,
+            bool? pinned = null,
+            bool? muted = null,
+            bool? hidden = null,
+            bool clearHistory = false)
+        {
+            if (string.IsNullOrWhiteSpace(conversationId))
+                throw new ArgumentException("conversationId must not be empty.");
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("userId must not be empty.");
+
+            var updates = new Dictionary<string, object>();
+
+            string prefix = $"userSettings.{userId}.";
+            if (pinned.HasValue) updates[prefix + "pinned"] = pinned.Value;
+            if (muted.HasValue) updates[prefix + "muted"] = muted.Value;
+            if (hidden.HasValue) updates[prefix + "hidden"] = hidden.Value;
+            if (clearHistory) updates[prefix + "clearedAt"] = FieldValue.ServerTimestamp;
+            updates[prefix + "updatedAt"] = FieldValue.ServerTimestamp;
+
+            await _db.Collection("conversations").Document(conversationId).UpdateAsync(updates);
+        }
+
+        /// <summary>
+        /// Create a group conversation.
+        /// The conversation document is stored in "conversations" and messages reference it by conversationId.
+        /// </summary>
+        public async Task<string> CreateGroupConversation(
+            string creatorUserId,
+            string groupName,
+            List<string> participantUserIds,
+            string? groupAvatarDataUrl = null)
+        {
+            if (string.IsNullOrWhiteSpace(creatorUserId))
+                throw new ArgumentException("creatorUserId must not be empty.");
+
+            groupName = (groupName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(groupName))
+                throw new ArgumentException("groupName must not be empty.");
+
+            participantUserIds ??= new List<string>();
+            var participants = participantUserIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Append(creatorUserId)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (participants.Count < 3)
+                throw new ArgumentException("A group must have at least 3 participants (including creator).");
+
+            string conversationId = Guid.NewGuid().ToString("N");
+            var convRef = _db.Collection("conversations").Document(conversationId);
+
+            var conversationData = new Dictionary<string, object>
+            {
+                { "isGroup", true },
+                { "groupName", groupName },
+                { "participants", participants },
+                { "createdBy", creatorUserId },
+                { "createdAt", FieldValue.ServerTimestamp },
+                { "lastMessageAt", FieldValue.ServerTimestamp },
+                { "lastMessage", string.Empty }
+            };
+
+            if (!string.IsNullOrWhiteSpace(groupAvatarDataUrl))
+            {
+                conversationData["groupAvatarDataUrl"] = groupAvatarDataUrl;
+            }
+
+            await convRef.SetAsync(conversationData, SetOptions.MergeAll);
+            return conversationId;
         }
 
         /// <summary>
@@ -275,16 +453,24 @@ namespace MessagingApp.Services
 
                 var snapshot = await query.GetSnapshotAsync();
 
+                var batch = _db.StartBatch();
+                int updates = 0;
+
                 foreach (var doc in snapshot.Documents)
                 {
                     string senderId = doc.GetValue<string>("senderId");
-                    if (senderId != userId)
+                    if (senderId == userId) continue;
+
+                    batch.Update(doc.Reference, new Dictionary<string, object>
                     {
-                        await doc.Reference.UpdateAsync(new Dictionary<string, object>
-                        {
-                            { "read", true }
-                        });
-                    }
+                        { "read", true }
+                    });
+                    updates++;
+                }
+
+                if (updates > 0)
+                {
+                    await batch.CommitAsync();
                 }
             }
             catch (Exception ex)

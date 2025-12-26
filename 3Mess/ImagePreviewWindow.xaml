@@ -1,25 +1,67 @@
 <Window x:Class="ThreeMess.ImagePreviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Xem ảnh" Width="900" Height="650" MinWidth="520" MinHeight="420"
-        WindowStartupLocation="CenterOwner">
-    <Grid Background="#FFF5F6F8" Margin="12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        Title="Xem ảnh" Width="980" Height="720" MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False">
+    <Grid x:Name="Backdrop" Background="Transparent" MouseDown="Backdrop_MouseDown">
+        <Border x:Name="ContentHost" Background="#FFF5F6F8" CornerRadius="14" BorderBrush="#1F000000" BorderThickness="1"
+                Width="920" Height="680" MaxWidth="920" MaxHeight="680"
+                HorizontalAlignment="Center" VerticalAlignment="Center" Padding="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-        <Border Background="White" CornerRadius="12" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="10">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <Image x:Name="PreviewImage" Stretch="Uniform" />
-            </ScrollViewer>
+                <Grid Grid.Row="0" Height="32">
+                    <Button Width="34" Height="28" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Click="CloseButton_Click" Background="#00FFFFFF" BorderThickness="0" Cursor="Hand">
+                        <TextBlock Text="×" FontSize="20" Foreground="#FF111827" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </Grid>
+
+                <Border Grid.Row="1" Background="White" CornerRadius="12" BorderBrush="#FFE5E7EB" BorderThickness="1" Padding="10">
+                    <Grid>
+                        <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+
+                        <Border x:Name="IndexBadge" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Background="#CC111827" CornerRadius="10" Padding="10,4" Margin="6"
+                                Visibility="Collapsed">
+                            <TextBlock x:Name="IndexText" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="2" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="PrevButton" Width="44" Height="36" Click="PrevButton_Click"
+                            Background="#FFF9FAFB" Foreground="#FF111827" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand" Margin="0,0,8,0">
+                        <TextBlock Text="‹" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+
+                    <Button x:Name="NextButton" Grid.Column="1" Width="44" Height="36" Click="NextButton_Click"
+                            Background="#FFF9FAFB" Foreground="#FF111827" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand">
+                        <TextBlock Text="›" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+
+                    <Button Grid.Column="3" Width="140" Height="36" Click="SaveButton_Click"
+                            Background="#FF2563EB" Foreground="White" BorderThickness="0" Cursor="Hand">
+                        <TextBlock Text="Lưu ảnh" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    </Button>
+                </Grid>
+            </Grid>
         </Border>
-
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Width="140" Height="36" Click="SaveButton_Click"
-                    Background="#FF2563EB" Foreground="White" BorderThickness="0" Cursor="Hand">
-                <TextBlock Text="Lưu ảnh" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
-            </Button>
-        </StackPanel>
     </Grid>
 </Window>

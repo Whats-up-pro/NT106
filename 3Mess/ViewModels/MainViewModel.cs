@@ -30,6 +30,11 @@ public sealed class MainViewModel : ObservableObject
     private string _incomingAvatarText = "A";
     private bool _showGroups;
 
+    private bool _showRightLinks;
+
+    private bool _rightImagesExpanded;
+    private bool _rightFilesExpanded;
+
     private string? _lastSelectedFriendUserId;
     private string? _lastSelectedGroupConversationId;
 
@@ -38,6 +43,10 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<object> SidebarItems { get; } = new();
     public ObservableCollection<MessageItemViewModel> Messages { get; } = new();
     public ObservableCollection<MemberItemViewModel> Members { get; } = new();
+
+    public ObservableCollection<RightSidebarAttachmentItemViewModel> RightImages { get; } = new();
+    public ObservableCollection<RightSidebarAttachmentItemViewModel> RightFiles { get; } = new();
+    public ObservableCollection<RightSidebarLinkItemViewModel> RightLinks { get; } = new();
 
     private readonly List<FriendItemViewModel> _allFriends = new();
     private readonly List<GroupChatItemViewModel> _allGroups = new();
@@ -70,6 +79,30 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public bool ShowFriends => !ShowGroups;
+
+    public bool ShowRightLinks
+    {
+        get => _showRightLinks;
+        set
+        {
+            if (!SetProperty(ref _showRightLinks, value)) return;
+            OnPropertyChanged(nameof(ShowRightDocs));
+        }
+    }
+
+    public bool ShowRightDocs => !ShowRightLinks;
+
+    public bool RightImagesExpanded
+    {
+        get => _rightImagesExpanded;
+        set => SetProperty(ref _rightImagesExpanded, value);
+    }
+
+    public bool RightFilesExpanded
+    {
+        get => _rightFilesExpanded;
+        set => SetProperty(ref _rightFilesExpanded, value);
+    }
 
     public object? SelectedSidebarItem
     {
@@ -131,6 +164,12 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ShowFriendsCommand { get; }
     public ICommand ShowGroupsCommand { get; }
 
+    public ICommand ShowRightDocsCommand { get; }
+    public ICommand ShowRightLinksCommand { get; }
+
+    public ICommand ToggleRightImagesExpandedCommand { get; }
+    public ICommand ToggleRightFilesExpandedCommand { get; }
+
     public ICommand DeleteConversationCommand { get; }
     public ICommand TogglePinConversationCommand { get; }
     public ICommand UpdatePinnedCommand { get; }
@@ -167,6 +206,12 @@ public sealed class MainViewModel : ObservableObject
 
         ShowFriendsCommand = new RelayCommand(() => ShowGroups = false);
         ShowGroupsCommand = new RelayCommand(() => ShowGroups = true);
+
+        ShowRightDocsCommand = new RelayCommand(() => ShowRightLinks = false);
+        ShowRightLinksCommand = new RelayCommand(() => ShowRightLinks = true);
+
+        ToggleRightImagesExpandedCommand = new RelayCommand(() => RightImagesExpanded = !RightImagesExpanded);
+        ToggleRightFilesExpandedCommand = new RelayCommand(() => RightFilesExpanded = !RightFilesExpanded);
 
         DeleteConversationCommand = new RelayCommand<object>(o => _ = DeleteConversationAsync(o), o => o != null);
         TogglePinConversationCommand = new RelayCommand<object>(o => _ = TogglePinAsync(o), o => o != null);
@@ -840,6 +885,12 @@ public sealed class MainViewModel : ObservableObject
         {
             Messages.Clear();
             Members.Clear();
+            RightImages.Clear();
+            RightFiles.Clear();
+            RightLinks.Clear();
+
+            RightImagesExpanded = false;
+            RightFilesExpanded = false;
 
             if (!string.IsNullOrWhiteSpace(targetConversationId)
                 && _messageCache.TryGetValue(targetConversationId, out var cached)
@@ -849,6 +900,8 @@ public sealed class MainViewModel : ObservableObject
                 {
                     Messages.Add(vm);
                 }
+
+                RebuildRightSidebarArtifactsFromMessages(cached);
             }
         });
 
@@ -1028,7 +1081,57 @@ public sealed class MainViewModel : ObservableObject
         {
             SyncMessagesIncremental(viewModels);
             _messageCache[conversationId] = Messages.ToList();
+
+            if (string.Equals(SelectedConversation?.ConversationId, conversationId, StringComparison.Ordinal))
+            {
+                RebuildRightSidebarArtifactsFromMessages(Messages);
+            }
         });
+    }
+
+    private void RebuildRightSidebarArtifactsFromMessages(IEnumerable<MessageItemViewModel> source)
+    {
+        RightImages.Clear();
+        RightFiles.Clear();
+        RightLinks.Clear();
+
+        foreach (var msg in source.OrderByDescending(m => m.Time))
+        {
+            if (msg.Kind == MessageBubbleKind.Image && msg.Image != null)
+            {
+                RightImages.Add(new RightSidebarAttachmentItemViewModel
+                {
+                    Kind = RightSidebarAttachmentKind.Image,
+                    Thumbnail = msg.Image,
+                    Title = "Ảnh",
+                    Time = msg.Time
+                });
+                continue;
+            }
+
+            if (msg.Kind == MessageBubbleKind.File)
+            {
+                RightFiles.Add(new RightSidebarAttachmentItemViewModel
+                {
+                    Kind = RightSidebarAttachmentKind.File,
+                    Title = string.IsNullOrWhiteSpace(msg.FileName) ? "File" : msg.FileName!,
+                    StorageBucket = msg.StorageBucket,
+                    StorageObject = msg.StorageObject,
+                    Time = msg.Time
+                });
+                continue;
+            }
+
+            if (msg.Kind == MessageBubbleKind.Link && msg.LinkUri != null)
+            {
+                RightLinks.Add(new RightSidebarLinkItemViewModel
+                {
+                    Text = string.IsNullOrWhiteSpace(msg.LinkText) ? msg.LinkUri.ToString() : msg.LinkText!,
+                    Uri = msg.LinkUri,
+                    Time = msg.Time
+                });
+            }
+        }
     }
 
     private void SyncMessagesIncremental(List<MessageItemViewModel> newItems)
@@ -1508,6 +1611,20 @@ public sealed class MainViewModel : ObservableObject
         }
 
         return await _storageService.DownloadToFileAsync(bucket!, obj!, destinationPath);
+    }
+
+    public Task<(bool success, string message)> SaveStorageObjectToPathAsync(string? bucket, string? storageObject, string destinationPath)
+    {
+        var resolvedBucket = string.IsNullOrWhiteSpace(bucket)
+            ? MessagingApp.Config.FirebaseConfig.StorageBucket
+            : bucket;
+
+        if (string.IsNullOrWhiteSpace(storageObject))
+        {
+            return Task.FromResult<(bool success, string message)>((false, "Thiếu thông tin file trên Storage."));
+        }
+
+        return _storageService.DownloadToFileAsync(resolvedBucket!, storageObject!, destinationPath);
     }
 
     private static byte[]? TryLoadAndCompressToJpeg(string filePath, int maxDimension, int quality)

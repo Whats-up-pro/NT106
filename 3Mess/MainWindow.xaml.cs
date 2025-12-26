@@ -222,4 +222,61 @@ public partial class MainWindow : Window
         }
         e.Handled = true;
     }
+
+    private void RightSidebarImage_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (sender is not FrameworkElement fe) return;
+        if (fe.DataContext is not RightSidebarAttachmentItemViewModel item) return;
+        if (item.Thumbnail is not ImageSource clicked) return;
+
+        try
+        {
+            var sources = vm.RightImages
+                .Select(x => x.Thumbnail)
+                .OfType<ImageSource>()
+                .ToList();
+
+            int index = sources.FindIndex(s => ReferenceEquals(s, clicked));
+            if (index < 0) index = 0;
+
+            var win = new ImagePreviewWindow(sources, index)
+            {
+                Owner = this
+            };
+            win.ShowDialog();
+        }
+        catch
+        {
+            MessageBox.Show("Không thể mở xem ảnh.", "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void RightSidebarFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (sender is not FrameworkElement fe) return;
+        if (fe.DataContext is not RightSidebarAttachmentItemViewModel item) return;
+
+        var sfd = new SaveFileDialog
+        {
+            Title = "Lưu file",
+            FileName = string.IsNullOrWhiteSpace(item.Title) ? "download" : item.Title
+        };
+
+        if (sfd.ShowDialog(this) != true) return;
+
+        try
+        {
+            var (success, message) = await vm.SaveStorageObjectToPathAsync(item.StorageBucket, item.StorageObject, sfd.FileName);
+            if (!success)
+            {
+                MessageBox.Show(message, "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch
+        {
+            MessageBox.Show("Không thể lưu file.", "3Mess", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 }

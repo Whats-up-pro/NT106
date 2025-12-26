@@ -10,9 +10,11 @@
         Title="MessagingApp" Height="720" Width="1180" MinHeight="640" MinWidth="1050"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
         <LinearGradientBrush x:Key="ChatBackground" StartPoint="0,0" EndPoint="1,0">
-            <GradientStop Color="#FFF1F5F9" Offset="0" />
-            <GradientStop Color="#FFEEF2FF" Offset="1" />
+            <GradientStop Color="#FFEBF1F7" Offset="0" />
+            <GradientStop Color="#FFE6ECFF" Offset="1" />
         </LinearGradientBrush>
 
         <Style x:Key="Card" TargetType="Border">
@@ -23,7 +25,7 @@
         </Style>
 
         <Style x:Key="BlueSidebarCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="Background" Value="#FFEEF2FF" />
+            <Setter Property="Background" Value="#FFE6ECFF" />
         </Style>
 
         <Style x:Key="IconButton" TargetType="Button">
@@ -49,7 +51,7 @@
 
         <Style x:Key="RightSidebarCard" TargetType="Border">
             <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Background" Value="#FFEEF2FF" />
+            <Setter Property="Background" Value="#FFE6ECFF" />
             <Setter Property="Padding" Value="12" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
@@ -567,7 +569,7 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid Background="#FFF5F6F8">
+    <Grid Background="#FFF1F5F9">
         <Grid Margin="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="270" />
@@ -692,12 +694,12 @@
                     <!-- Header -->
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="56" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="56" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Width="36" Height="36" CornerRadius="18" Background="#FFE5E7EB" VerticalAlignment="Center" Margin="6,0,10,0">
+                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="18" Background="#FFE5E7EB" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="6,0,0,0">
                             <Grid>
                                 <Image Source="{Binding SelectedConversation.AvatarImage}" Stretch="UniformToFill">
                                     <Image.Style>
@@ -728,8 +730,13 @@
                             </Grid>
                         </Border>
 
-                        <TextBlock Grid.Column="1" Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}" FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
-                                   VerticalAlignment="Center" HorizontalAlignment="Left" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}"
+                                   FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
 
                         <TextBlock Grid.Column="2" Text="" />
                     </Grid>
@@ -784,15 +791,13 @@
                 </Grid>
             </Border>
 
-            <!-- Right: actions + members + docs (dark) -->
+            <!-- Right: actions + members (group only) + docs -->
             <Border Grid.Column="2" Style="{StaticResource RightSidebarCard}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- Top icons (4 slots: 3 buttons + avatar) -->
@@ -827,77 +832,218 @@
                         </Button>
                     </UniformGrid>
 
-                    <!-- Members header -->
-                    <Border Grid.Row="2" Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
-                        <TextBlock Text="Thành viên" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                    </Border>
+                    <!-- Content (independent scroll areas) -->
+                    <StackPanel Grid.Row="2">
+                            <!-- Members section (group chat only) -->
+                            <StackPanel Visibility="{Binding SelectedConversation.IsGroup, Converter={StaticResource BoolToVis}}">
+                                <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
+                                    <TextBlock Text="Thành viên" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </Border>
 
-                    <!-- Members list -->
-                    <ListBox Grid.Row="3" ItemsSource="{Binding Members}" BorderThickness="0" Background="Transparent"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="0,0,0,8" />
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border CornerRadius="12" Background="#FFFFFFFF" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="8">
-                                                <ContentPresenter />
+                                <ListBox ItemsSource="{Binding Members}" BorderThickness="0" Background="Transparent"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         MaxHeight="180">
+                                    <ListBox.Resources>
+                                        <Style TargetType="ScrollBar">
+                                            <Setter Property="Width" Value="8" />
+                                        </Style>
+                                    </ListBox.Resources>
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,0,8" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <Border CornerRadius="12" Background="#FFFFFFFF" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="8">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                </ListBox>
+
+                                <Border Height="1" Background="#FFBFDBFE" Opacity="0.7" Margin="0,6,0,12" />
+                            </StackPanel>
+
+                            <!-- Docs section (toggle: Tài liệu | Link) -->
+                            <Grid Margin="2,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button Content="Tài liệu"
+                                        Command="{Binding ShowRightDocsCommand}"
+                                        Background="Transparent" BorderThickness="0" Padding="0"
+                                        HorizontalAlignment="Left" Cursor="Hand">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="FontSize" Value="16" />
+                                            <Setter Property="Foreground" Value="#FF6B7280" />
+                                            <Setter Property="FontWeight" Value="Normal" />
+                                            <Setter Property="TextElement.FontWeight" Value="Normal" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowRightLinks}" Value="False">
+                                                    <Setter Property="Foreground" Value="#FF1E3A8A" />
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                    <Setter Property="TextBlock.TextDecorations" Value="Underline" />
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Opacity" Value="0.9" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <Button Grid.Column="1" Content="Link"
+                                        Command="{Binding ShowRightLinksCommand}"
+                                        Background="Transparent" BorderThickness="0" Padding="0"
+                                        HorizontalAlignment="Right" Cursor="Hand">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="FontSize" Value="16" />
+                                            <Setter Property="Foreground" Value="#FF6B7280" />
+                                            <Setter Property="FontWeight" Value="Normal" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowRightLinks}" Value="True">
+                                                    <Setter Property="Foreground" Value="#FF1E3A8A" />
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                    <Setter Property="TextBlock.TextDecorations" Value="Underline" />
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Opacity" Value="0.9" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+
+                            <!-- Docs view (Images/Videos + Files) -->
+                            <StackPanel Visibility="{Binding ShowRightDocs, Converter={StaticResource BoolToVis}}">
+                                <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                        Command="{Binding ToggleRightImagesExpandedCommand}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8" HorizontalAlignment="Stretch">
+                                        <TextBlock Text="Hình ảnh &amp; Video" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </Border>
+                                </Button>
+
+                                <ScrollViewer Visibility="{Binding RightImagesExpanded, Converter={StaticResource BoolToVis}}"
+                                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                              MaxHeight="260" Margin="0,0,0,6">
+                                    <ScrollViewer.Resources>
+                                        <Style TargetType="ScrollBar">
+                                            <Setter Property="Width" Value="8" />
+                                        </Style>
+                                    </ScrollViewer.Resources>
+
+                                    <ItemsControl ItemsSource="{Binding RightImages}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Columns="3" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                                        Click="RightSidebarImage_Click">
+                                                    <Border Height="72" Width="72" CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" Margin="0,0,8,8">
+                                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                                    </Border>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                        Command="{Binding ToggleRightFilesExpandedCommand}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch">
+                                    <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,6,0,8" HorizontalAlignment="Stretch">
+                                        <TextBlock Text="Tệp" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </Border>
+                                </Button>
+
+                                <ListBox ItemsSource="{Binding RightFiles}" BorderThickness="0" Background="Transparent"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         MaxHeight="260"
+                                         Visibility="{Binding RightFilesExpanded, Converter={StaticResource BoolToVis}}">
+                                    <ListBox.Resources>
+                                        <Style TargetType="ScrollBar">
+                                            <Setter Property="Width" Value="8" />
+                                        </Style>
+                                    </ListBox.Resources>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                                    Click="RightSidebarFile_Click">
+                                                <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="48" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Border Width="40" Height="40" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" VerticalAlignment="Center">
+                                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" FontSize="18" Foreground="#FF6B7280"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+
+                                                        <StackPanel Grid.Column="1" Margin="10,0,10,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}" Foreground="#FF111827" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="Bấm để tải" Foreground="#FF6B7280" FontSize="12" />
+                                                        </StackPanel>
+
+                                                        <TextBlock Grid.Column="2" FontFamily="Segoe MDL2 Assets" Text="&#xE896;" Foreground="#FF2563EB" VerticalAlignment="Center" FontSize="16" />
+                                                    </Grid>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <!-- Links view -->
+                            <StackPanel Visibility="{Binding ShowRightLinks, Converter={StaticResource BoolToVis}}">
+                                <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
+                                    <TextBlock Text="Link" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </Border>
+
+                                <ListBox ItemsSource="{Binding RightLinks}" BorderThickness="0" Background="Transparent"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         MaxHeight="420">
+                                    <ListBox.Resources>
+                                        <Style TargetType="ScrollBar">
+                                            <Setter Property="Width" Value="8" />
+                                        </Style>
+                                    </ListBox.Resources>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                                                <TextBlock TextWrapping="Wrap" FontWeight="SemiBold">
+                                                    <Hyperlink NavigateUri="{Binding Uri}"
+                                                               RequestNavigate="Hyperlink_RequestNavigate"
+                                                               Foreground="#FF2563EB">
+                                                        <Run Text="{Binding Text}" />
+                                                    </Hyperlink>
+                                                </TextBlock>
                                             </Border>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
-
-                    <!-- Docs section -->
-                    <StackPanel Grid.Row="4" Margin="0,12,0,0">
-                        <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
-                            <TextBlock Text="Tài liệu" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        </Border>
-
-                        <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Hình ảnh &amp; Video" Foreground="#FF111827" FontWeight="SemiBold" />
-                                <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE70D;" Foreground="#FF6B7280" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
-
-                        <UniformGrid Columns="3" Margin="0,10,0,0">
-                            <Border Height="56" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" Margin="0,0,8,0" />
-                            <Border Height="56" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" Margin="0,0,8,0" />
-                            <Border Height="56" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" />
-                        </UniformGrid>
-
-                        <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,10,0,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Tài liệu" Foreground="#FF111827" FontWeight="SemiBold" />
-                                <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" Foreground="#FF6B7280" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
-
-                        <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,10,0,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Liên kết" Foreground="#FF111827" FontWeight="SemiBold" />
-                                <TextBlock Grid.Column="1" FontFamily="Segoe MDL2 Assets" Text="&#xE72A;" Foreground="#FF6B7280" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>

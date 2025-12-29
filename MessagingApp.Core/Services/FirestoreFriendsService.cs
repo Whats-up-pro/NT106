@@ -30,6 +30,7 @@ namespace MessagingApp.Services
             try
             {
                 var users = new List<Dictionary<string, object>>();
+                var seen = new HashSet<string>(StringComparer.Ordinal);
 
                 // Search by email (exact match preferred)
                 var emailQuery = _db.Collection("users")
@@ -45,29 +46,38 @@ namespace MessagingApp.Services
                     {
                         var userData = doc.ToDictionary();
                         userData["userId"] = doc.Id;
-                        users.Add(userData);
+                        if (seen.Add(doc.Id)) users.Add(userData);
                     }
                 }
 
-                // Search by username if no email results
-                if (users.Count == 0)
-                {
-                    var usernameQuery = _db.Collection("users")
-                        .WhereGreaterThanOrEqualTo("username", searchText.ToLower())
-                        .WhereLessThanOrEqualTo("username", searchText.ToLower() + "\uf8ff")
-                        .Limit(10);
+                // Search by username (add-on)
+                var usernameQuery = _db.Collection("users")
+                    .WhereGreaterThanOrEqualTo("username", searchText.ToLower())
+                    .WhereLessThanOrEqualTo("username", searchText.ToLower() + "\uf8ff")
+                    .Limit(10);
 
-                    var usernameSnapshot = await usernameQuery.GetSnapshotAsync();
-                    
-                    foreach (var doc in usernameSnapshot.Documents)
-                    {
-                        if (doc.Id != currentUserId)
-                        {
-                            var userData = doc.ToDictionary();
-                            userData["userId"] = doc.Id;
-                            users.Add(userData);
-                        }
-                    }
+                var usernameSnapshot = await usernameQuery.GetSnapshotAsync();
+                foreach (var doc in usernameSnapshot.Documents)
+                {
+                    if (doc.Id == currentUserId) continue;
+                    var userData = doc.ToDictionary();
+                    userData["userId"] = doc.Id;
+                    if (seen.Add(doc.Id)) users.Add(userData);
+                }
+
+                // Search by fullName (add-on)
+                var fullNameQuery = _db.Collection("users")
+                    .WhereGreaterThanOrEqualTo("fullName", searchText)
+                    .WhereLessThanOrEqualTo("fullName", searchText + "\uf8ff")
+                    .Limit(10);
+
+                var fullNameSnapshot = await fullNameQuery.GetSnapshotAsync();
+                foreach (var doc in fullNameSnapshot.Documents)
+                {
+                    if (doc.Id == currentUserId) continue;
+                    var userData = doc.ToDictionary();
+                    userData["userId"] = doc.Id;
+                    if (seen.Add(doc.Id)) users.Add(userData);
                 }
 
                 return users;
@@ -437,6 +447,203 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
+        /// Fetch a user's document data.
+        /// </summary>
+        public async Task<Dictionary<string, object>?> GetUserAsync(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userId)) return null;
+                var snap = await _db.Collection("users").Document(userId).GetSnapshotAsync();
+                if (!snap.Exists) return null;
+
+                var data = snap.ToDictionary();
+                data["userId"] = snap.Id;
+                return data;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting user: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Update a user's presence state.
+        /// Writes: isOnline (bool), status ("online"/"offline"), lastSeen (server timestamp)
+        /// </summary>
+        public async Task UpdatePresenceAsync(string userId, bool isOnline)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userId)) return;
+
+                var docRef = _db.Collection("users").Document(userId);
+                var updates = new Dictionary<string, object>
+                {
+                    { "isOnline", isOnline },
+                    { "status", isOnline ? "online" : "offline" },
+                    { "lastSeen", FieldValue.ServerTimestamp }
+                };
+
+                try
+                {
+                    await docRef.UpdateAsync(updates);
+                }
+                catch
+                {
+                    // In case the user doc doesn't exist yet.
+                    await docRef.SetAsync(updates, SetOptions.MergeAll);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating presence: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Count number of friends for a user.
+        /// </summary>
+        public async Task<int> GetFriendsCountAsync(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userId)) return 0;
+                var snapshot = await _db.Collection("friendships")
+                    .WhereArrayContains("users", userId)
+                    .GetSnapshotAsync();
+                return snapshot.Count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting friends count: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Get set of toUserIds for pending outgoing friend requests.
+        /// </summary>
+        public async Task<HashSet<string>> GetOutgoingPendingRequestToUserIdsAsync(string fromUserId)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                if (string.IsNullOrWhiteSpace(fromUserId)) return result;
+
+                var snapshot = await _db.Collection("friendRequests")
+                    .WhereEqualTo("fromUserId", fromUserId)
+                    .WhereEqualTo("status", "pending")
+                    .GetSnapshotAsync();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    try
+                    {
+                        if (doc.ContainsField("toUserId"))
+                        {
+                            var toId = doc.GetValue<string>("toUserId");
+                            if (!string.IsNullOrWhiteSpace(toId)) result.Add(toId);
+                        }
+                    }
+                    catch { }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting outgoing pending requests: {ex.Message}");
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Get mapping fromUserId -> requestId for pending incoming friend requests.
+        /// </summary>
+        public async Task<Dictionary<string, string>> GetIncomingPendingRequestFromUserIdToRequestIdAsync(string toUserId)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            try
+            {
+                if (string.IsNullOrWhiteSpace(toUserId)) return result;
+
+                var snapshot = await _db.Collection("friendRequests")
+                    .WhereEqualTo("toUserId", toUserId)
+                    .WhereEqualTo("status", "pending")
+                    .GetSnapshotAsync();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    try
+                    {
+                        if (!doc.ContainsField("fromUserId")) continue;
+                        var fromId = doc.GetValue<string>("fromUserId");
+                        if (string.IsNullOrWhiteSpace(fromId)) continue;
+                        result[fromId] = doc.Id;
+                    }
+                    catch { }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting incoming pending requests: {ex.Message}");
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Remove friendship between two users if it exists.
+        /// </summary>
+        public async Task<(bool success, string message)> UnfriendAsync(string userId1, string userId2)
+        {
+            if (string.IsNullOrWhiteSpace(userId1) || string.IsNullOrWhiteSpace(userId2))
+                return (false, "Thiếu thông tin người dùng.");
+            if (userId1 == userId2)
+                return (false, "Không hợp lệ.");
+
+            try
+            {
+                var snapshot = await _db.Collection("friendships")
+                    .WhereArrayContains("users", userId1)
+                    .GetSnapshotAsync();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    List<string>? users = null;
+                    try
+                    {
+                        users = doc.GetValue<List<string>>("users");
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            var raw = doc.GetValue<IList<object>>("users");
+                            users = raw?.Select(u => u?.ToString() ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                        }
+                        catch { }
+                    }
+
+                    if (users != null && users.Contains(userId2))
+                    {
+                        await _db.Collection("friendships").Document(doc.Id).DeleteAsync();
+                        return (true, "Đã hủy kết bạn.");
+                    }
+                }
+
+                return (false, "Không tìm thấy quan hệ bạn bè.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Decline friend request
         /// </summary>
         public async Task<(bool success, string message)> DeclineFriendRequest(string requestId)
@@ -450,6 +657,71 @@ namespace MessagingApp.Services
                 });
 
                 return (true, "Đã từ chối lời mời kết bạn!");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Cancel an outgoing pending friend request (so the recipient no longer sees it).
+        /// </summary>
+        public async Task<(bool success, string message)> CancelFriendRequest(string fromUserId, string toUserId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(fromUserId) || string.IsNullOrWhiteSpace(toUserId))
+                    return (false, "Thiếu thông tin người dùng.");
+                if (fromUserId == toUserId)
+                    return (false, "Không hợp lệ.");
+
+                // Prefer canonical id (newer logic)
+                try
+                {
+                    var canonicalId = GetCanonicalPairId(fromUserId, toUserId);
+                    var docRef = _db.Collection("friendRequests").Document(canonicalId);
+                    var snap = await docRef.GetSnapshotAsync();
+                    if (snap.Exists)
+                    {
+                        var status = snap.ContainsField("status") ? snap.GetValue<string>("status") : string.Empty;
+                        var from = snap.ContainsField("fromUserId") ? snap.GetValue<string>("fromUserId") : string.Empty;
+                        var to = snap.ContainsField("toUserId") ? snap.GetValue<string>("toUserId") : string.Empty;
+
+                        if (string.Equals(status, "pending", StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(from, fromUserId, StringComparison.Ordinal)
+                            && string.Equals(to, toUserId, StringComparison.Ordinal))
+                        {
+                            await docRef.UpdateAsync(new Dictionary<string, object>
+                            {
+                                { "status", "cancelled" },
+                                { "cancelledAt", FieldValue.ServerTimestamp }
+                            });
+                            return (true, "Đã hủy gửi lời mời kết bạn.");
+                        }
+                    }
+                }
+                catch { }
+
+                // Fallback: query by fields
+                var query = await _db.Collection("friendRequests")
+                    .WhereEqualTo("fromUserId", fromUserId)
+                    .WhereEqualTo("toUserId", toUserId)
+                    .WhereEqualTo("status", "pending")
+                    .Limit(1)
+                    .GetSnapshotAsync();
+
+                if (query.Count == 0)
+                    return (false, "Không còn lời mời để hủy.");
+
+                var doc = query.Documents[0];
+                await _db.Collection("friendRequests").Document(doc.Id).UpdateAsync(new Dictionary<string, object>
+                {
+                    { "status", "cancelled" },
+                    { "cancelledAt", FieldValue.ServerTimestamp }
+                });
+
+                return (true, "Đã hủy gửi lời mời kết bạn.");
             }
             catch (Exception ex)
             {

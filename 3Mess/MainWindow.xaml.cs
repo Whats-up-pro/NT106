@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Navigation;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using ThreeMess.ViewModels;
 
@@ -17,6 +18,8 @@ namespace ThreeMess;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private DispatcherTimer? _presenceTimer;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -26,6 +29,15 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             UpdateEmptyState();
+
+            _ = vm.UpdatePresenceAsync(true);
+
+            _presenceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(25) };
+            _presenceTimer.Tick += (_, _) =>
+            {
+                _ = vm.UpdatePresenceAsync(true);
+            };
+            _presenceTimer.Start();
 
             if (vm.Messages is INotifyCollectionChanged incc)
             {
@@ -53,6 +65,12 @@ public partial class MainWindow : Window
                 e.Handled = true;
             };
         };
+
+        Closing += (_, _) =>
+        {
+            try { _presenceTimer?.Stop(); } catch { }
+            _ = vm.UpdatePresenceAsync(false);
+        };
     }
 
     private void UpdateEmptyState()
@@ -73,6 +91,15 @@ public partial class MainWindow : Window
     {
         var ext = Path.GetExtension(path)?.ToLowerInvariant();
         return ext is ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp";
+    }
+
+    private void RightSidebarFriends_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (vm.ToggleFriendFinderModeCommand.CanExecute(null))
+        {
+            vm.ToggleFriendFinderModeCommand.Execute(null);
+        }
     }
 
     private async void AttachButton_Click(object sender, RoutedEventArgs e)

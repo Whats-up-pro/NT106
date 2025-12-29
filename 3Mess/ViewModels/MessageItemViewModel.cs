@@ -18,6 +18,7 @@ public sealed class MessageItemViewModel : ObservableObject
     private string? _storageObject;
     private string? _linkText;
     private Uri? _linkUri;
+    private bool _isRead;
 
     public string MessageId { get; init; } = string.Empty;
     public string SenderId { get; init; } = string.Empty;
@@ -37,13 +38,34 @@ public sealed class MessageItemViewModel : ObservableObject
     public DateTime Time
     {
         get => _time;
-        set => SetProperty(ref _time, value);
+        set
+        {
+            if (!SetProperty(ref _time, value)) return;
+            OnPropertyChanged(nameof(TimeText));
+            OnPropertyChanged(nameof(MetaText));
+        }
     }
 
     public bool IsOutgoing
     {
         get => _isOutgoing;
-        set => SetProperty(ref _isOutgoing, value);
+        set
+        {
+            if (!SetProperty(ref _isOutgoing, value)) return;
+            OnPropertyChanged(nameof(OutgoingStatusText));
+            OnPropertyChanged(nameof(MetaText));
+        }
+    }
+
+    public bool IsRead
+    {
+        get => _isRead;
+        set
+        {
+            if (!SetProperty(ref _isRead, value)) return;
+            OnPropertyChanged(nameof(OutgoingStatusText));
+            OnPropertyChanged(nameof(MetaText));
+        }
     }
 
     public ImageSource? Image
@@ -90,5 +112,29 @@ public sealed class MessageItemViewModel : ObservableObject
 
     public string SenderAvatarText { get; init; } = "?";
     public string TimeText => Time.ToString("HH:mm");
+
+    public string OutgoingStatusText
+    {
+        get
+        {
+            if (!IsOutgoing) return string.Empty;
+            if (!string.IsNullOrWhiteSpace(MessageId) && MessageId.StartsWith("local-", StringComparison.Ordinal))
+            {
+                return "Đang gửi";
+            }
+            return IsRead ? "Đã xem" : "Đã gửi";
+        }
+    }
+
+    public string MetaText
+    {
+        get
+        {
+            if (!IsOutgoing) return TimeText;
+            var status = OutgoingStatusText;
+            if (string.IsNullOrWhiteSpace(status)) return TimeText;
+            return $"{TimeText} • {status}";
+        }
+    }
 }
 

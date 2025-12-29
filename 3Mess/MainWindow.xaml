@@ -188,8 +188,27 @@
                 </Grid.ColumnDefinitions>
 
                 <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Grid FlowDirection="LeftToRight">
+                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                        <!-- Presence dot (bottom-right) -->
+                        <Ellipse Width="12" Height="12"
+                                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                 Margin="0,0,1,1"
+                                 Stroke="#FFF9FAFB" StrokeThickness="2">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="#FF9CA3AF" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="Đang hoạt động">
+                                            <Setter Property="Fill" Value="#FF10B981" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                    </Grid>
                 </Border>
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
@@ -487,7 +506,7 @@
                                 </TextBlock>
                             </Border>
 
-                            <TextBlock x:Name="TimeText" Text="{Binding TimeText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
+                            <TextBlock x:Name="TimeText" Text="{Binding MetaText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
 
@@ -584,6 +603,22 @@
             <Border Grid.Column="0" Style="{StaticResource BlueSidebarCard}" Margin="0,0,12,0">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Normal sidebar (friends/groups) -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFriendFinderMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                    <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -679,12 +714,227 @@
                             </Style>
                         </ListBox.ItemContainerStyle>
                     </ListBox>
+                    </Grid>
+
+                    <!-- Friend finder sidebar -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFriendFinderMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Kết bạn" FontSize="16" FontWeight="SemiBold" Foreground="#FF111827" Margin="2,0,0,10" />
+
+                        <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="10" BorderBrush="#FFE5E7EB" BorderThickness="1">
+                            <DockPanel LastChildFill="True">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="#FF6B7280" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBox Style="{StaticResource WatermarkTextBox}" Tag="Tìm kiếm email hoặc username"
+                                         Text="{Binding FriendFinderSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         BorderThickness="0" Background="Transparent" Foreground="#FF111827"
+                                         FontSize="13" VerticalContentAlignment="Center" Padding="0" />
+                            </DockPanel>
+                        </Border>
+
+                        <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                            <TextBlock Text="{Binding FriendFinderStatusText}" Foreground="#FF6B7280" FontSize="12" Margin="2,0,0,8" />
+
+                            <ListBox ItemsSource="{Binding FriendFinderResults}"
+                                     SelectedItem="{Binding SelectedFriendFinderUser}"
+                                     BorderThickness="0" Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Hidden">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="48" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}" Foreground="#FF6B7280" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <Grid Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                <!-- Single action (Kết bạn/Đã gửi/Bạn bè) -->
+                                                <Button Width="72" Height="28"
+                                                        Background="#FFFFFFFF" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                                                        Cursor="Hand"
+                                                        Command="{Binding DataContext.SendFriendFinderRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding CanAction}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Background" Value="#FFFFFFFF" />
+                                                            <Setter Property="Foreground" Value="#FF111827" />
+                                                            <Setter Property="BorderThickness" Value="1" />
+                                                            <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                            <Setter Property="Template">
+                                                                <Setter.Value>
+                                                                    <ControlTemplate TargetType="Button">
+                                                                        <Border Background="{TemplateBinding Background}"
+                                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                                CornerRadius="18">
+                                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        </Border>
+                                                                    </ControlTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsRequestPending}" Value="True">
+                                                                    <Setter Property="Background" Value="#FFF3F4F6" />
+                                                                    <Setter Property="Foreground" Value="#FF6B7280" />
+                                                                    <Setter Property="BorderThickness" Value="1" />
+                                                                    <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsFriend}" Value="True">
+                                                                    <Setter Property="Background" Value="#FF111827" />
+                                                                    <Setter Property="Foreground" Value="White" />
+                                                                    <Setter Property="BorderThickness" Value="0" />
+                                                                    <Setter Property="BorderBrush" Value="#FF111827" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding ShowIncomingActions}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE710;"
+                                                                   FontSize="12" Margin="0,0,6,0"
+                                                                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsFriend}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsRequestPending}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding ActionText}" FontSize="12"
+                                                                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                                                   FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <!-- Incoming request actions (Chấp nhận / Từ chối) -->
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ShowIncomingActions}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+
+                                                    <Button Width="72" Height="28" Margin="0,0,6,0"
+                                                            Background="#FF111827" BorderThickness="0" Cursor="Hand"
+                                                            Command="{Binding DataContext.AcceptFriendFinderRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" CornerRadius="12">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <TextBlock Text="Chấp nhận" Foreground="White" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Button>
+
+                                                    <Button Width="60" Height="28"
+                                                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                            Command="{Binding DataContext.DeclineFriendFinderRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="12">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <TextBlock Text="Từ chối" Foreground="#FF111827" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,0,6" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="ItemBorder" CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1">
+                                                        <ContentPresenter />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="#FFE0EAFF" />
+                                                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#FFBBD2FF" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
 
-            <!-- Middle: chat -->
+            <!-- Middle: chat / profile -->
             <Border Grid.Column="1" CornerRadius="16" Background="{StaticResource ChatBackground}" Padding="10" Margin="0,0,12,0">
                 <Grid>
+                    <!-- Normal chat -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFriendFinderMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="64" />
                         <RowDefinition Height="*" />
@@ -730,13 +980,19 @@
                             </Grid>
                         </Border>
 
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}"
-                                   FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   TextAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}"
+                                       FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding OtherTypingText}"
+                                       Foreground="#FF6B7280"
+                                       FontSize="12"
+                                       Margin="0,2,0,0"
+                                       HorizontalAlignment="Center"
+                                       Visibility="{Binding IsOtherTyping, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
 
                         <TextBlock Grid.Column="2" Text="" />
                     </Grid>
@@ -788,6 +1044,285 @@
                             </Button>
                         </Grid>
                     </Border>
+
+                    </Grid>
+
+                    <!-- Profile view (friend finder mode) -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFriendFinderMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Hồ sơ" FontSize="16" FontWeight="SemiBold" Foreground="#FF111827" Margin="2,0,0,10" />
+
+                        <Border Grid.Row="1" Background="#00000000" CornerRadius="14" Padding="0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Profile content -->
+                                <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedProfile}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="180" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Cover -->
+                                <Border Grid.Row="0" CornerRadius="16" Background="#FFE6ECFF" ClipToBounds="True">
+                                    <Grid>
+                                        <Image Source="{Binding SelectedProfile.CoverImage}" Stretch="UniformToFill">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedProfile.CoverImage}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Avatar (overlap) -->
+                                <Border Grid.Row="0" Width="88" Height="88" CornerRadius="44" Background="#FFF9FAFB"
+                                        BorderBrush="#FFFFFFFF" BorderThickness="4"
+                                        VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="20,0,0,-44">
+                                    <Grid>
+                                        <Image Source="{Binding SelectedProfile.AvatarImage}" Stretch="UniformToFill">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedProfile.AvatarImage}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
+                                        <TextBlock Text="{Binding SelectedProfile.AvatarText}" FontWeight="SemiBold" Foreground="#FF111827" FontSize="28"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedProfile.AvatarImage}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Header info -->
+                                <StackPanel Grid.Row="1" Margin="20,54,20,0">
+                                    <DockPanel LastChildFill="True">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding SelectedProfile.DisplayName}" FontSize="22" FontWeight="SemiBold" Foreground="#FF111827" />
+                                            <TextBlock Text="{Binding SelectedProfile.Subtitle}" FontSize="12" Foreground="#FF6B7280" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding SelectedProfile.FriendsCountText}" FontSize="12" Foreground="#FF6B7280" Margin="0,6,0,0" />
+                                        </StackPanel>
+
+                                        <Grid DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Center">
+                                            <!-- Single action -->
+                                            <Button Width="98" Height="34"
+                                                    Background="#FFFFFFFF" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                    Command="{Binding SendFriendFinderRequestCommand}"
+                                                    CommandParameter="{Binding SelectedFriendFinderUser}"
+                                                    IsEnabled="{Binding SelectedFriendFinderUser.CanAction}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Background" Value="#FFFFFFFF" />
+                                                        <Setter Property="Foreground" Value="#FF111827" />
+                                                        <Setter Property="BorderThickness" Value="1" />
+                                                        <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border Background="{TemplateBinding Background}"
+                                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                                            CornerRadius="18">
+                                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Border>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsRequestPending}" Value="True">
+                                                                <Setter Property="Background" Value="#FFF3F4F6" />
+                                                                <Setter Property="Foreground" Value="#FF6B7280" />
+                                                                <Setter Property="BorderThickness" Value="1" />
+                                                                <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsFriend}" Value="True">
+                                                                <Setter Property="Background" Value="#FF111827" />
+                                                                <Setter Property="Foreground" Value="White" />
+                                                                <Setter Property="BorderThickness" Value="0" />
+                                                                <Setter Property="BorderBrush" Value="#FF111827" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding SelectedFriendFinderUser.ShowIncomingActions}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE710;"
+                                                               FontSize="12" Margin="0,0,8,0"
+                                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsFriend}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsRequestPending}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding SelectedFriendFinderUser.ActionText}"
+                                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=Button}, Path=Foreground}"
+                                                               FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- Incoming request actions -->
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SelectedFriendFinderUser.ShowIncomingActions}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+
+                                                <Button Width="98" Height="34" Margin="0,0,8,0"
+                                                        Background="#FF111827" BorderThickness="0" Cursor="Hand"
+                                                        Command="{Binding AcceptFriendFinderRequestCommand}"
+                                                        CommandParameter="{Binding SelectedFriendFinderUser}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="18">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <TextBlock Text="Chấp nhận" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Button>
+
+                                                <Button Width="74" Height="34"
+                                                        Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                        Command="{Binding DeclineFriendFinderRequestCommand}"
+                                                        CommandParameter="{Binding SelectedFriendFinderUser}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}"
+                                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                                    CornerRadius="18">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <TextBlock Text="Từ chối" Foreground="#FF111827" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DockPanel>
+                                </StackPanel>
+
+                                <!-- About -->
+                                <Border Grid.Row="2" Margin="20,14,20,0" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="14" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock Text="About" FontWeight="SemiBold" Foreground="#FF111827" />
+                                        <TextBlock Text="{Binding SelectedProfile.About}" Foreground="#FF374151" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedProfile.About}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="Người dùng chưa cập nhật giới thiệu." Foreground="#FF6B7280" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedProfile.About}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <TextBlock Text="{Binding SelectedProfile.StatusText}"
+                                                   Foreground="#FF6B7280" FontSize="12" Margin="0,8,0,0"
+                                                   Visibility="{Binding SelectedProfile.IsBusy, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                </Border>
+                                </Grid>
+
+                                <!-- Empty state when no profile selected -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedProfile}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="Chọn một người dùng" Foreground="#FF111827" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
+                                <TextBlock Text="để xem hồ sơ" Foreground="#FF6B7280" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
             </Border>
 
@@ -824,8 +1359,8 @@
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" FontSize="20" Foreground="#FF111827" />
                         </Button>
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE902;" FontSize="20" Foreground="#FF111827" />
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Kết bạn" Click="RightSidebarFriends_Click">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE716;" FontSize="20" Foreground="#FF111827" />
                         </Button>
                         <Button Style="{StaticResource RightSidebarIconButton}">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE840;" FontSize="20" Foreground="#FF111827" />
@@ -1048,6 +1583,39 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <!-- In-app confirm bar (no separate window) -->
+        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="14"
+                Padding="12" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Panel.ZIndex="999"
+                Visibility="{Binding IsConfirmVisible, Converter={StaticResource BoolToVis}}">
+            <DockPanel LastChildFill="True">
+                <TextBlock Text="{Binding ConfirmMessage}" Foreground="#FF111827" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+                    <Button Height="34" MinWidth="84" Margin="0,0,8,0"
+                            Background="#FF111827" BorderThickness="0" Cursor="Hand"
+                            Command="{Binding ConfirmOkCommand}">
+                        <TextBlock Text="{Binding ConfirmOkText}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Height="34" MinWidth="84"
+                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                            Command="{Binding ConfirmCancelCommand}">
+                        <TextBlock Text="{Binding ConfirmCancelText}" Foreground="#FF111827" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- In-app toast -->
+        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="14"
+                Padding="10" Margin="16,0,16,72" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Panel.ZIndex="998"
+                Visibility="{Binding IsToastVisible, Converter={StaticResource BoolToVis}}">
+            <DockPanel>
+                <Border Width="6" CornerRadius="999" Background="{Binding ToastAccentBrush}" Margin="0,0,10,0" />
+                <TextBlock Text="{Binding ToastMessage}" Foreground="#FF111827" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>
 

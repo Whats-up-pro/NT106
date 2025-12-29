@@ -517,6 +517,50 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
+        /// Listen to a conversation document (real-time).
+        /// Useful for typing indicators or other per-conversation metadata.
+        /// </summary>
+        public FirestoreChangeListener ListenToConversation(string conversationId, Action<Dictionary<string, object>> onChanged)
+        {
+            var docRef = _db.Collection("conversations").Document(conversationId);
+            return docRef.Listen(snapshot =>
+            {
+                try
+                {
+                    onChanged(snapshot.Exists ? snapshot.ToDictionary() : new Dictionary<string, object>());
+                }
+                catch
+                {
+                    // ignore callback errors
+                }
+            });
+        }
+
+        /// <summary>
+        /// Update typing state for a user in a conversation.
+        /// Stored as conversations/{conversationId}.typing.{userId} = server timestamp.
+        /// </summary>
+        public Task SetTypingAsync(string conversationId, string userId, bool isTyping)
+        {
+            if (string.IsNullOrWhiteSpace(conversationId)) throw new ArgumentException("conversationId must not be empty.");
+            if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentException("userId must not be empty.");
+
+            var updates = new Dictionary<string, object>();
+            string key = $"typing.{userId}";
+
+            if (isTyping)
+            {
+                updates[key] = FieldValue.ServerTimestamp;
+            }
+            else
+            {
+                updates[key] = FieldValue.Delete;
+            }
+
+            return _db.Collection("conversations").Document(conversationId).UpdateAsync(updates);
+        }
+
+        /// <summary>
         /// Get unread message count for user
         /// </summary>
         public async Task<int> GetUnreadMessageCount(string userId)
@@ -584,49 +628,6 @@ namespace MessagingApp.Services
                 Console.WriteLine($"Error getting unread count for conversation: {ex.Message}");
                 return 0;
             }
-        }
-
-        /// <summary>
-        /// Set typing state for a user within a conversation.
-        /// </summary>
-        public async Task SetTypingAsync(string conversationId, string userId, bool isTyping)
-        {
-            try
-            {
-                var docRef = _db.Collection("conversations").Document(conversationId)
-                    .Collection("typing").Document(userId);
-                await docRef.SetAsync(new Dictionary<string, object>
-                {
-                    { "typing", isTyping },
-                    { "updatedAt", FieldValue.ServerTimestamp }
-                }, SetOptions.MergeAll);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error setting typing state: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Listen to typing state of the other user in a conversation.
-        /// </summary>
-        public FirestoreChangeListener ListenToTyping(string conversationId, string otherUserId, Action<bool> onTypingChanged)
-        {
-            var docRef = _db.Collection("conversations").Document(conversationId)
-                .Collection("typing").Document(otherUserId);
-            return docRef.Listen(snapshot =>
-            {
-                bool isTyping = false;
-                try
-                {
-                    if (snapshot.Exists && snapshot.ContainsField("typing"))
-                    {
-                        isTyping = snapshot.GetValue<bool>("typing");
-                    }
-                }
-                catch { }
-                onTypingChanged(isTyping);
-            });
         }
 
         /// <summary>

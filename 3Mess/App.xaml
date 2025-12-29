@@ -5,14 +5,21 @@
              xmlns:infra="clr-namespace:ThreeMess.Infrastructure"
              StartupUri="LandingWindow.xaml">
     <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Default theme is Light; can be swapped at runtime -->
+                <ResourceDictionary Source="Themes/Light.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Existing control styles, now theme-aware -->
         <Style x:Key="WatermarkTextBox" TargetType="TextBox">
             <Setter Property="Height" Value="40" />
             <Setter Property="Padding" Value="12,8" />
-            <Setter Property="BorderBrush" Value="#FFD1D5DB" />
+            <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="#FFF9FAFB" />
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
             <Setter Property="FontSize" Value="14" />
-            <Setter Property="Foreground" Value="#FF111827" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -21,7 +28,7 @@
                             <TextBlock x:Name="Watermark"
                                        Text="{TemplateBinding Tag}"
                                        Margin="12,0,0,0"
-                                       Foreground="#FF9CA3AF"
+                                       Foreground="{DynamicResource WatermarkBrush}"
                                        VerticalAlignment="Center"
                                        IsHitTestVisible="False"
                                        Visibility="Collapsed" />
@@ -45,9 +52,9 @@
         <Style x:Key="WatermarkPasswordBox" TargetType="PasswordBox">
             <Setter Property="Height" Value="40" />
             <Setter Property="Padding" Value="12,8" />
-            <Setter Property="BorderBrush" Value="#FFD1D5DB" />
+            <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="#FFF9FAFB" />
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -57,7 +64,7 @@
                             <TextBlock x:Name="Watermark"
                                        Text="{TemplateBinding Tag}"
                                        Margin="12,0,0,0"
-                                       Foreground="#FF9CA3AF"
+                                       Foreground="{DynamicResource WatermarkBrush}"
                                        VerticalAlignment="Center"
                                        IsHitTestVisible="False"
                                        Visibility="Collapsed" />
@@ -77,6 +84,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
 

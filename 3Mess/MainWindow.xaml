@@ -8,32 +8,57 @@
     xmlns:models="clr-namespace:ThreeMess.Models"
         mc:Ignorable="d"
         Title="MessagingApp" Height="720" Width="1180" MinHeight="640" MinWidth="1050"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BackgroundBrush}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-        <LinearGradientBrush x:Key="ChatBackground" StartPoint="0,0" EndPoint="1,0">
-            <GradientStop Color="#FFEBF1F7" Offset="0" />
-            <GradientStop Color="#FFE6ECFF" Offset="1" />
-        </LinearGradientBrush>
+        <Style x:Key="RightSidebarIconToggleButton" TargetType="ToggleButton">
+            <Setter Property="Height" Value="52" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="999">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.92" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.6" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
 
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Background" Value="#FFF3F4F6" />
+            <Setter Property="Background" Value="{DynamicResource CardBrush}" />
             <Setter Property="Padding" Value="12" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
 
         <Style x:Key="BlueSidebarCard" TargetType="Border" BasedOn="{StaticResource Card}">
-            <Setter Property="Background" Value="#FFE6ECFF" />
+            <Setter Property="Background" Value="{DynamicResource SidebarBrush}" />
         </Style>
 
         <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="44" />
             <Setter Property="Margin" Value="0,0,0,10" />
-            <Setter Property="Background" Value="White" />
-            <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -51,7 +76,7 @@
 
         <Style x:Key="RightSidebarCard" TargetType="Border">
             <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Background" Value="#FFE6ECFF" />
+            <Setter Property="Background" Value="{DynamicResource SidebarBrush}" />
             <Setter Property="Padding" Value="12" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
@@ -59,8 +84,8 @@
         <Style x:Key="RightSidebarIconButton" TargetType="Button">
             <Setter Property="Height" Value="52" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="Background" Value="#FFFFFFFF" />
-            <Setter Property="BorderBrush" Value="#FFBFDBFE" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
@@ -86,15 +111,15 @@
         </Style>
 
         <Style x:Key="RightSidebarPillHeader" TargetType="Border">
-            <Setter Property="Background" Value="#FFDBEAFE" />
+            <Setter Property="Background" Value="{DynamicResource PillHeaderBrush}" />
             <Setter Property="CornerRadius" Value="12" />
             <Setter Property="Padding" Value="10,8" />
-            <Setter Property="BorderBrush" Value="#FFBFDBFE" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
         </Style>
 
         <Style x:Key="PrimarySendButton" TargetType="Button">
-            <Setter Property="Background" Value="#FF2563EB" />
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Cursor" Value="Hand" />
@@ -146,17 +171,17 @@
             <Setter Property="Width" Value="40" />
             <Setter Property="Height" Value="20" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Background" Value="#FFE5E7EB" />
+            <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Grid>
                             <Border CornerRadius="10" Background="{TemplateBinding Background}" />
-                            <Border x:Name="Knob" Width="16" Height="16" CornerRadius="8" Background="White" Margin="2" HorizontalAlignment="Left" />
+                            <Border x:Name="Knob" Width="16" Height="16" CornerRadius="8" Background="{DynamicResource SurfaceBrush}" Margin="2" HorizontalAlignment="Left" />
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="Background" Value="#FF2563EB" />
+                                <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -174,7 +199,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FFF3F4F6" />
+                    <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -187,19 +212,19 @@
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
 
-                <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center">
                     <Grid FlowDirection="LeftToRight">
-                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
 
                         <!-- Presence dot (bottom-right) -->
                         <Ellipse Width="12" Height="12"
                                  HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                  Margin="0,0,1,1"
-                                 Stroke="#FFF9FAFB" StrokeThickness="2">
+                                 Stroke="{DynamicResource SurfaceBrush}" StrokeThickness="2">
                             <Ellipse.Style>
                                 <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="#FF9CA3AF" />
+                                    <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Status}" Value="Đang hoạt động">
                                             <Setter Property="Fill" Value="#FF10B981" />
@@ -213,12 +238,12 @@
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                     <DockPanel LastChildFill="True">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock DockPanel.Dock="Right"
                                    FontFamily="Segoe MDL2 Assets"
                                    Text="&#xE840;"
                                    FontSize="12"
-                                   Foreground="#FF2563EB"
+                                   Foreground="{DynamicResource PrimaryBrush}"
                                    Margin="6,1,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -232,7 +257,7 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </DockPanel>
-                    <TextBlock Text="{Binding Status}" Foreground="#FF6B7280" FontSize="12" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Status}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
 
                 <Grid Grid.Column="2" VerticalAlignment="Center">
@@ -242,7 +267,7 @@
                     <Popup Placement="Bottom" PlacementTarget="{Binding ElementName=MoreBtn}"
                            IsOpen="{Binding IsChecked, ElementName=MoreBtn, Mode=TwoWay}"
                            StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="10" Padding="10">
+                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10">
                             <StackPanel Width="230">
                                 <Border Style="{StaticResource MenuRow}">
                                     <Grid>
@@ -250,7 +275,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Ghim" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <TextBlock Text="Ghim" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                         <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
                                                       IsChecked="{Binding IsPinned, Mode=TwoWay}"
                                                       Command="{Binding DataContext.UpdatePinnedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -264,7 +289,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Thông báo" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <TextBlock Text="Thông báo" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                         <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
                                                       IsChecked="{Binding NotificationsEnabled, Mode=TwoWay}"
                                                       Command="{Binding DataContext.UpdateNotificationsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -272,7 +297,7 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Height="1" Background="#FFE5E7EB" Margin="0,8" />
+                                <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,8" />
 
                                 <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch" Padding="0"
                                         Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -296,7 +321,7 @@
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
 
-                <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center">
                     <Grid>
                         <Image Source="{Binding AvatarImage}" Stretch="UniformToFill">
                             <Image.Style>
@@ -310,7 +335,7 @@
                                 </Style>
                             </Image.Style>
                         </Image>
-                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -328,12 +353,12 @@
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                     <DockPanel LastChildFill="True">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock DockPanel.Dock="Right"
                                    FontFamily="Segoe MDL2 Assets"
                                    Text="&#xE840;"
                                    FontSize="12"
-                                   Foreground="#FF2563EB"
+                                   Foreground="{DynamicResource PrimaryBrush}"
                                    Margin="6,1,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
@@ -347,7 +372,7 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </DockPanel>
-                    <TextBlock Text="Nhóm" Foreground="#FF6B7280" FontSize="12" />
+                    <TextBlock Text="Nhóm" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
                 </StackPanel>
 
                 <Grid Grid.Column="2" VerticalAlignment="Center">
@@ -357,7 +382,7 @@
                     <Popup Placement="Bottom" PlacementTarget="{Binding ElementName=MoreBtnG}"
                            IsOpen="{Binding IsChecked, ElementName=MoreBtnG, Mode=TwoWay}"
                            StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="10" Padding="10">
+                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10">
                             <StackPanel Width="230">
                                 <Border Style="{StaticResource MenuRow}">
                                     <Grid>
@@ -365,7 +390,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Ghim" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <TextBlock Text="Ghim" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                         <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
                                                       IsChecked="{Binding IsPinned, Mode=TwoWay}"
                                                       Command="{Binding DataContext.UpdatePinnedCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -379,7 +404,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Thông báo" FontSize="14" FontWeight="SemiBold" Foreground="#FF111827" VerticalAlignment="Center" />
+                                        <TextBlock Text="Thông báo" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                                         <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
                                                       IsChecked="{Binding NotificationsEnabled, Mode=TwoWay}"
                                                       Command="{Binding DataContext.UpdateNotificationsCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -387,7 +412,7 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Height="1" Background="#FFE5E7EB" Margin="0,8" />
+                                <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,8" />
 
                                 <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch" Padding="0"
                                         Command="{Binding DataContext.DeleteConversationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -410,13 +435,13 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
-                <Border Width="32" Height="32" CornerRadius="16" Background="#FFDBEAFE" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF1E3A8A"
+                <Border Width="32" Height="32" CornerRadius="16" Background="{DynamicResource PillHeaderBrush}" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#FF111827" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource TextPrimaryBrush}" />
                 <Button Grid.Column="2" Width="28" Height="28" Margin="0" Background="Transparent" BorderThickness="0" Cursor="Hand">
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="14" Foreground="#FF6B7280" />
+                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </Button>
             </Grid>
         </DataTemplate>
@@ -429,8 +454,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Border x:Name="LeftAvatar" Width="28" Height="28" CornerRadius="14" Background="#FFE5E7EB" VerticalAlignment="Bottom" Margin="0,0,8,0">
-                    <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                <Border x:Name="LeftAvatar" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Bottom" Margin="0,0,8,0">
+                    <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
                 </Border>
 
@@ -439,20 +464,20 @@
                     <Button x:Name="LeftActionButton"
                             Width="28" Height="28"
                             Margin="0,0,6,0"
-                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             Cursor="Hand"
                             Visibility="Collapsed"
                             Opacity="0.55"
                             Command="{Binding DataContext.RevokeMessageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding}">
-                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12" Foreground="#FF6B7280"
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
 
-                    <Border x:Name="Bubble" Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                    <Border x:Name="Bubble" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             CornerRadius="16" Padding="14,10" MaxWidth="640">
                         <StackPanel>
-                            <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="#FF111827" FontSize="15" />
+                            <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" />
                             <Image x:Name="MessageImage"
                                    Source="{Binding Image}"
                                    Visibility="Collapsed"
@@ -506,7 +531,7 @@
                                 </TextBlock>
                             </Border>
 
-                            <TextBlock x:Name="TimeText" Text="{Binding MetaText}" Foreground="#FF6B7280" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
+                            <TextBlock x:Name="TimeText" Text="{Binding MetaText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
 
@@ -514,19 +539,19 @@
                     <Button x:Name="RightActionButton"
                             Width="28" Height="28"
                             Margin="6,0,0,0"
-                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                             Cursor="Hand"
                             Visibility="Collapsed"
                             Opacity="0.55"
                             Command="{Binding DataContext.HideMessageLocallyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding}">
-                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12" Foreground="#FF6B7280"
+                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
                 </StackPanel>
 
-                <Border x:Name="RightAvatar" Grid.Column="2" Width="28" Height="28" CornerRadius="14" Background="#FFE5E7EB" VerticalAlignment="Bottom" Margin="8,0,0,0" Visibility="Collapsed">
-                    <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                <Border x:Name="RightAvatar" Grid.Column="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Bottom" Margin="8,0,0,0" Visibility="Collapsed">
+                    <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
                 </Border>
             </Grid>
@@ -588,7 +613,7 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid Background="#FFF1F5F9">
+    <Grid Background="{DynamicResource BackgroundBrush}">
         <Grid Margin="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="270" />
@@ -636,11 +661,11 @@
                                 HorizontalAlignment="Left" Cursor="Hand">
                             <Button.Style>
                                 <Style TargetType="Button">
-                                    <Setter Property="Foreground" Value="#FF6B7280" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                     <Setter Property="FontWeight" Value="Normal" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ShowGroups}" Value="False">
-                                            <Setter Property="Foreground" Value="#FF111827" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                             <Setter Property="FontWeight" Value="SemiBold" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -654,11 +679,11 @@
                                 HorizontalAlignment="Right" Cursor="Hand">
                             <Button.Style>
                                 <Style TargetType="Button">
-                                    <Setter Property="Foreground" Value="#FF6B7280" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                     <Setter Property="FontWeight" Value="Normal" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ShowGroups}" Value="True">
-                                            <Setter Property="Foreground" Value="#FF111827" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                             <Setter Property="FontWeight" Value="SemiBold" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -667,21 +692,21 @@
                         </Button>
                     </Grid>
 
-                    <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="10" BorderBrush="#FFE5E7EB" BorderThickness="1">
+                    <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="12" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                         <DockPanel LastChildFill="True">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="#FF6B7280" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
                             <Button DockPanel.Dock="Right"
                                     Width="28" Height="28" Margin="8,0,0,0"
-                                    Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                                    Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                     Cursor="Hand"
                                     ToolTip="Tạo group chat"
                                     Command="{Binding OpenCreateGroupCommand}">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE710;" FontSize="12" Foreground="#FF6B7280"
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE710;" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                             <TextBox Style="{StaticResource WatermarkTextBox}" Tag="Tìm kiếm"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     BorderThickness="0" Background="Transparent" Foreground="#FF111827"
+                                     BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                      FontSize="13" VerticalContentAlignment="Center" Padding="0" />
                         </DockPanel>
                     </Border>
@@ -699,13 +724,13 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="ItemBorder" CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1">
+                                            <Border x:Name="ItemBorder" CornerRadius="12" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                                                 <ContentPresenter />
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#FFE0EAFF" />
-                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#FFBBD2FF" />
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource BorderFocusBrush}" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -735,20 +760,20 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Text="Kết bạn" FontSize="16" FontWeight="SemiBold" Foreground="#FF111827" Margin="2,0,0,10" />
+                        <TextBlock Text="Kết bạn" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="2,0,0,10" />
 
-                        <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="10" BorderBrush="#FFE5E7EB" BorderThickness="1">
+                        <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="12" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                             <DockPanel LastChildFill="True">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="#FF6B7280" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE721;" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBox Style="{StaticResource WatermarkTextBox}" Tag="Tìm kiếm email hoặc username"
                                          Text="{Binding FriendFinderSearchText, UpdateSourceTrigger=PropertyChanged}"
-                                         BorderThickness="0" Background="Transparent" Foreground="#FF111827"
+                                         BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                          FontSize="13" VerticalContentAlignment="Center" Padding="0" />
                             </DockPanel>
                         </Border>
 
                         <StackPanel Grid.Row="2" Margin="0,12,0,0">
-                            <TextBlock Text="{Binding FriendFinderStatusText}" Foreground="#FF6B7280" FontSize="12" Margin="2,0,0,8" />
+                            <TextBlock Text="{Binding FriendFinderStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="2,0,0,8" />
 
                             <ListBox ItemsSource="{Binding FriendFinderResults}"
                                      SelectedItem="{Binding SelectedFriendFinderUser}"
@@ -764,30 +789,30 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
+                                            <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
 
                                             <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Subtitle}" Foreground="#FF6B7280" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
                                             <Grid Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
                                                 <!-- Single action (Kết bạn/Đã gửi/Bạn bè) -->
                                                 <Button Width="72" Height="28"
-                                                        Background="#FFFFFFFF" BorderBrush="#FFE5E7EB" BorderThickness="1"
+                                                        Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                                         Cursor="Hand"
                                                         Command="{Binding DataContext.SendFriendFinderRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                         CommandParameter="{Binding}"
                                                         IsEnabled="{Binding CanAction}">
                                                     <Button.Style>
                                                         <Style TargetType="Button">
-                                                            <Setter Property="Background" Value="#FFFFFFFF" />
-                                                            <Setter Property="Foreground" Value="#FF111827" />
+                                                            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                             <Setter Property="BorderThickness" Value="1" />
-                                                            <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                                             <Setter Property="Template">
                                                                 <Setter.Value>
                                                                     <ControlTemplate TargetType="Button">
@@ -872,7 +897,7 @@
                                                     </Button>
 
                                                     <Button Width="60" Height="28"
-                                                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                            Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
                                                             Command="{Binding DataContext.DeclineFriendFinderRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}">
                                                         <Button.Template>
@@ -885,7 +910,7 @@
                                                                 </Border>
                                                             </ControlTemplate>
                                                         </Button.Template>
-                                                        <TextBlock Text="Từ chối" Foreground="#FF111827" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        <TextBlock Text="Từ chối" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                     </Button>
                                                 </StackPanel>
                                             </Grid>
@@ -900,13 +925,13 @@
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="ListBoxItem">
-                                                    <Border x:Name="ItemBorder" CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1">
+                                                    <Border x:Name="ItemBorder" CornerRadius="12" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                                                         <ContentPresenter />
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <Trigger Property="IsSelected" Value="True">
-                                                            <Setter TargetName="ItemBorder" Property="Background" Value="#FFE0EAFF" />
-                                                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#FFBBD2FF" />
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource BorderFocusBrush}" />
                                                         </Trigger>
                                                     </ControlTemplate.Triggers>
                                                 </ControlTemplate>
@@ -921,7 +946,7 @@
             </Border>
 
             <!-- Middle: chat / profile -->
-            <Border Grid.Column="1" CornerRadius="16" Background="{StaticResource ChatBackground}" Padding="10" Margin="0,0,12,0">
+            <Border Grid.Column="1" CornerRadius="16" Background="{DynamicResource ChatBackgroundBrush}" Padding="10" Margin="0,0,12,0">
                 <Grid>
                     <!-- Normal chat -->
                     <Grid>
@@ -930,6 +955,9 @@
                                 <Setter Property="Visibility" Value="Visible" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsFriendFinderMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsProfileMode}" Value="True">
                                         <Setter Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -949,7 +977,7 @@
                             <ColumnDefinition Width="56" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="18" Background="#FFE5E7EB" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="6,0,0,0">
+                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="18" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="6,0,0,0">
                             <Grid>
                                 <Image Source="{Binding SelectedConversation.AvatarImage}" Stretch="UniformToFill">
                                     <Image.Style>
@@ -964,7 +992,7 @@
                                     </Image.Style>
                                 </Image>
                                 <TextBlock Text="{Binding SelectedConversation.AvatarText, FallbackValue=?}"
-                                           FontWeight="SemiBold" Foreground="#FF111827"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
                                            HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
@@ -982,12 +1010,12 @@
 
                         <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}"
-                                       FontWeight="SemiBold" FontSize="16" Foreground="#FF111827"
+                                       FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding OtherTypingText}"
-                                       Foreground="#FF6B7280"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="12"
                                        Margin="0,2,0,0"
                                        HorizontalAlignment="Center"
@@ -1015,14 +1043,14 @@
                             </ListBox>
 
                             <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="Chọn cuộc trò chuyện" Foreground="#FF111827" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
-                                <TextBlock Text="để bắt đầu nhắn tin" Foreground="#FF6B7280" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                <TextBlock Text="Chọn cuộc trò chuyện" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
+                                <TextBlock Text="để bắt đầu nhắn tin" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0" />
                             </StackPanel>
                         </Grid>
                     </Border>
 
                     <!-- Input -->
-                    <Border Grid.Row="2" Background="#FFE5E7EB" CornerRadius="14" Padding="8" Margin="0,10,0,0">
+                    <Border Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="14" Padding="8" Margin="0,10,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -1030,13 +1058,13 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Button Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="#FFF9FAFB" Click="AttachButton_Click">
-                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;" FontSize="16" Foreground="#FF6B7280" />
+                            <Button Style="{StaticResource IconButton}" Width="38" Height="38" Margin="0" Background="{DynamicResource SurfaceBrush}" Click="AttachButton_Click">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}" />
                             </Button>
 
                             <TextBox x:Name="DraftBox" Style="{StaticResource WatermarkTextBox}" Tag="Nhập tin nhắn..."
                                      Text="{Binding DraftMessage, UpdateSourceTrigger=PropertyChanged}"
-                                     BorderThickness="0" Background="Transparent" FontSize="14" Foreground="#FF111827"
+                                     BorderThickness="0" Background="Transparent" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}"
                                      VerticalContentAlignment="Center" Padding="2,1" Grid.Column="1" Margin="10,0,0,0" />
 
                             <Button Grid.Column="2" Style="{StaticResource PrimarySendButton}" Command="{Binding SendMessageCommand}" Margin="10,0,0,0" Width="40" Height="40" Padding="0">
@@ -1056,6 +1084,9 @@
                                     <DataTrigger Binding="{Binding IsFriendFinderMode}" Value="True">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsProfileMode}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Grid.Style>
@@ -1065,9 +1096,9 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Text="Hồ sơ" FontSize="16" FontWeight="SemiBold" Foreground="#FF111827" Margin="2,0,0,10" />
+                        <TextBlock Text="Hồ sơ" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="2,0,0,10" />
 
-                        <Border Grid.Row="1" Background="#00000000" CornerRadius="14" Padding="0">
+                        <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="30" Padding="0" ClipToBounds="True">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="*" />
@@ -1087,14 +1118,15 @@
                                 </Grid.Style>
 
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="180" />
+                                    <RowDefinition Height="210" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
                                 <!-- Cover -->
-                                <Border Grid.Row="0" CornerRadius="16" Background="#FFE6ECFF" ClipToBounds="True">
+                                <Border Grid.Row="0" CornerRadius="30" Background="#FFE6ECFF" ClipToBounds="True">
                                     <Grid>
+                                        <!-- Normal cover -->
                                         <Image Source="{Binding SelectedProfile.CoverImage}" Stretch="UniformToFill">
                                             <Image.Style>
                                                 <Style TargetType="Image">
@@ -1103,31 +1135,121 @@
                                                         <DataTrigger Binding="{Binding SelectedProfile.CoverImage}" Value="{x:Null}">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Image.Style>
-                                        </Image>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Avatar (overlap) -->
-                                <Border Grid.Row="0" Width="88" Height="88" CornerRadius="44" Background="#FFF9FAFB"
-                                        BorderBrush="#FFFFFFFF" BorderThickness="4"
-                                        VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="20,0,0,-44">
-                                    <Grid>
-                                        <Image Source="{Binding SelectedProfile.AvatarImage}" Stretch="UniformToFill">
-                                            <Image.Style>
-                                                <Style TargetType="Image">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding SelectedProfile.AvatarImage}" Value="{x:Null}">
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Image.Style>
                                         </Image>
-                                        <TextBlock Text="{Binding SelectedProfile.AvatarText}" FontWeight="SemiBold" Foreground="#FF111827" FontSize="28"
+
+                                        <!-- Edit preview cover (drag to reposition) -->
+                                        <Rectangle x:Name="EditCoverSurface" Cursor="SizeAll"
+                                                   MouseLeftButtonDown="EditCoverSurface_MouseLeftButtonDown"
+                                                   MouseMove="EditCoverSurface_MouseMove"
+                                                   MouseLeftButtonUp="EditCoverSurface_MouseLeftButtonUp"
+                                                   SizeChanged="EditCoverSurface_SizeChanged">
+                                            <Rectangle.Fill>
+                                                <ImageBrush ImageSource="{Binding EditCoverPreview}"
+                                                            Stretch="Fill"
+                                                            ViewboxUnits="RelativeToBoundingBox"
+                                                            Viewbox="{Binding EditCoverViewbox}" />
+                                            </Rectangle.Fill>
+                                            <Rectangle.Style>
+                                                <Style TargetType="Rectangle">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding EditCoverPreview}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Rectangle.Style>
+                                        </Rectangle>
+
+                                        <!-- Pick cover button (edit mode) -->
+                                        <Button Width="34" Height="34" Margin="0,12,12,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
+                                                Command="{Binding PickMyCoverCommand}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="17">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE114;" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Avatar (overlap) -->
+                                                                  <Grid x:Name="EditAvatarSurface" Grid.Row="0" Width="120" Height="120" Background="Transparent" Cursor="SizeAll"
+                                                                      MouseLeftButtonDown="EditAvatarSurface_MouseLeftButtonDown"
+                                                                      MouseMove="EditAvatarSurface_MouseMove"
+                                                                      MouseLeftButtonUp="EditAvatarSurface_MouseLeftButtonUp"
+                                      VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="20,0,0,-60">
+                                    <Grid>
+                                        <!-- White ring + base -->
+                                        <Ellipse Fill="{DynamicResource SurfaceBrush}" Stroke="{DynamicResource SurfaceBrush}" StrokeThickness="6" />
+
+                                        <!-- Normal avatar image (true circle clip) -->
+                                        <Ellipse>
+                                            <Ellipse.Fill>
+                                                <ImageBrush ImageSource="{Binding SelectedProfile.AvatarImage}" Stretch="UniformToFill" />
+                                            </Ellipse.Fill>
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedProfile.AvatarImage}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+
+                                        <!-- Edit preview avatar (true circle clip + drag to reposition) -->
+                                        <Ellipse>
+                                            <Ellipse.Fill>
+                                                <ImageBrush ImageSource="{Binding EditAvatarPreview}"
+                                                            Stretch="Fill"
+                                                            ViewboxUnits="RelativeToBoundingBox"
+                                                            Viewbox="{Binding EditAvatarViewbox}" />
+                                            </Ellipse.Fill>
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding EditAvatarPreview}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+
+                                        <TextBlock Text="{Binding SelectedProfile.AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="28"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
@@ -1136,35 +1258,140 @@
                                                         <DataTrigger Binding="{Binding SelectedProfile.AvatarImage}" Value="{x:Null}">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
+
+                                        <!-- Pick avatar button (edit mode) -->
+                                        <Button Width="30" Height="30" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,4"
+                                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
+                                                Command="{Binding PickMyAvatarCommand}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE114;" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
                                     </Grid>
-                                </Border>
+                                </Grid>
 
                                 <!-- Header info -->
-                                <StackPanel Grid.Row="1" Margin="20,54,20,0">
+                                <StackPanel Grid.Row="1" Margin="20,70,20,0">
                                     <DockPanel LastChildFill="True">
                                         <StackPanel>
-                                            <TextBlock Text="{Binding SelectedProfile.DisplayName}" FontSize="22" FontWeight="SemiBold" Foreground="#FF111827" />
-                                            <TextBlock Text="{Binding SelectedProfile.Subtitle}" FontSize="12" Foreground="#FF6B7280" Margin="0,2,0,0" />
-                                            <TextBlock Text="{Binding SelectedProfile.FriendsCountText}" FontSize="12" Foreground="#FF6B7280" Margin="0,6,0,0" />
+                                            <TextBlock Text="{Binding SelectedProfile.DisplayName}" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <TextBlock Text="{Binding SelectedProfile.Subtitle}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding SelectedProfile.FriendsCountText}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,0" />
                                         </StackPanel>
 
                                         <Grid DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Center">
+                                            <!-- My profile actions -->
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsViewingOwnProfile}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+
+                                                <!-- Edit button (not editing) -->
+                                                <Button Height="34" MinWidth="168" Padding="12,0" Cursor="Hand"
+                                                    Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                                        Command="{Binding BeginEditMyProfileCommand}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <TextBlock Text="Chỉnh sửa trang cá nhân" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+
+                                                <!-- Save / Cancel (editing) -->
+                                                <StackPanel Orientation="Horizontal">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+
+                                                    <Button Width="86" Height="34" Margin="0,0,8,0" Cursor="Hand"
+                                                            Background="#FF111827" BorderThickness="0"
+                                                            Command="{Binding SaveMyProfileCommand}">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" CornerRadius="18">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <TextBlock Text="Lưu" Foreground="White" FontWeight="SemiBold" />
+                                                    </Button>
+
+                                                    <Button Width="86" Height="34" Cursor="Hand"
+                                                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                                            Command="{Binding CancelEditMyProfileCommand}">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="18">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <TextBlock Text="Hủy" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </StackPanel>
+
                                             <!-- Single action -->
                                             <Button Width="98" Height="34"
-                                                    Background="#FFFFFFFF" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                    Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
                                                     Command="{Binding SendFriendFinderRequestCommand}"
                                                     CommandParameter="{Binding SelectedFriendFinderUser}"
                                                     IsEnabled="{Binding SelectedFriendFinderUser.CanAction}">
                                                 <Button.Style>
                                                     <Style TargetType="Button">
-                                                        <Setter Property="Background" Value="#FFFFFFFF" />
-                                                        <Setter Property="Foreground" Value="#FF111827" />
+                                                        <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                         <Setter Property="BorderThickness" Value="1" />
-                                                        <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                                         <Setter Property="Template">
                                                             <Setter.Value>
                                                                 <ControlTemplate TargetType="Button">
@@ -1179,11 +1406,14 @@
                                                         </Setter>
                                                         <Setter Property="Visibility" Value="Visible" />
                                                         <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsViewingOwnProfile}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
                                                             <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsRequestPending}" Value="True">
-                                                                <Setter Property="Background" Value="#FFF3F4F6" />
-                                                                <Setter Property="Foreground" Value="#FF6B7280" />
+                                                                <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                                                 <Setter Property="BorderThickness" Value="1" />
-                                                                <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsFriend}" Value="True">
                                                                 <Setter Property="Background" Value="#FF111827" />
@@ -1227,6 +1457,9 @@
                                                     <Style TargetType="StackPanel">
                                                         <Setter Property="Visibility" Value="Collapsed" />
                                                         <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsViewingOwnProfile}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
                                                             <DataTrigger Binding="{Binding SelectedFriendFinderUser.ShowIncomingActions}" Value="True">
                                                                 <Setter Property="Visibility" Value="Visible" />
                                                             </DataTrigger>
@@ -1249,7 +1482,7 @@
                                                 </Button>
 
                                                 <Button Width="74" Height="34"
-                                                        Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                                                    Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
                                                         Command="{Binding DeclineFriendFinderRequestCommand}"
                                                         CommandParameter="{Binding SelectedFriendFinderUser}">
                                                     <Button.Template>
@@ -1262,7 +1495,7 @@
                                                             </Border>
                                                         </ControlTemplate>
                                                     </Button.Template>
-                                                    <TextBlock Text="Từ chối" Foreground="#FF111827" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Từ chối" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
@@ -1270,14 +1503,34 @@
                                 </StackPanel>
 
                                 <!-- About -->
-                                <Border Grid.Row="2" Margin="20,14,20,0" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="14" Padding="14">
+                                <Border Grid.Row="2" Margin="20,14,20,0" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="14">
                                     <StackPanel>
-                                        <TextBlock Text="About" FontWeight="SemiBold" Foreground="#FF111827" />
-                                        <TextBlock Text="{Binding SelectedProfile.About}" Foreground="#FF374151" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap">
+                                        <TextBlock Text="About" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                                        <!-- Edit bio -->
+                                        <TextBox Text="{Binding EditBio, UpdateSourceTrigger=PropertyChanged}" MinHeight="84" TextWrapping="Wrap" AcceptsReturn="True"
+                                                 Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,10,0,0"
+                                                 Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13">
+                                            <TextBox.Style>
+                                                <Style TargetType="TextBox">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
+
+                                        <TextBlock Text="{Binding SelectedProfile.About}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                     <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                         <DataTrigger Binding="{Binding SelectedProfile.About}" Value="">
                                                             <Setter Property="Visibility" Value="Collapsed" />
                                                         </DataTrigger>
@@ -1285,11 +1538,14 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBlock Text="Người dùng chưa cập nhật giới thiệu." Foreground="#FF6B7280" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap">
+                                        <TextBlock Text="Người dùng chưa cập nhật giới thiệu." Foreground="{DynamicResource TextSecondaryBrush}" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                     <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditingMyProfile}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
                                                         <DataTrigger Binding="{Binding SelectedProfile.About}" Value="">
                                                             <Setter Property="Visibility" Value="Visible" />
                                                         </DataTrigger>
@@ -1299,7 +1555,7 @@
                                         </TextBlock>
 
                                         <TextBlock Text="{Binding SelectedProfile.StatusText}"
-                                                   Foreground="#FF6B7280" FontSize="12" Margin="0,8,0,0"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0"
                                                    Visibility="{Binding SelectedProfile.IsBusy, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                 </Border>
@@ -1317,8 +1573,8 @@
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <TextBlock Text="Chọn một người dùng" Foreground="#FF111827" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
-                                <TextBlock Text="để xem hồ sơ" Foreground="#FF6B7280" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                <TextBlock Text="Chọn một người dùng" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
+                                <TextBlock Text="để xem hồ sơ" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,0" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -1337,33 +1593,119 @@
 
                     <!-- Top icons (4 slots: 3 buttons + avatar) -->
                     <UniformGrid Columns="4" Margin="0,0,0,10">
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="20" Foreground="#FF111827" />
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Trang chủ" Command="{Binding GoHomeCommand}">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7ED;" FontSize="20" Foreground="#FF111827" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7ED;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="20" Foreground="#FF111827" />
+                        <Grid Margin="0,0,8,0">
+                            <ToggleButton x:Name="SettingsToggle" Style="{StaticResource RightSidebarIconToggleButton}" ToolTip="Cài đặt">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            </ToggleButton>
+
+                            <Popup x:Name="SettingsPopup" Placement="Bottom" PlacementTarget="{Binding ElementName=SettingsToggle}"
+                                   IsOpen="{Binding IsChecked, ElementName=SettingsToggle, Mode=TwoWay}"
+                                   StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade"
+                                   Closed="SettingsPopup_Closed">
+                                <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                        CornerRadius="12" Padding="12" Width="240">
+                                    <StackPanel>
+                                        <TextBlock Text="Cài đặt" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Chế độ tối" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                          IsChecked="{Binding IsDarkMode, Mode=TwoWay}" />
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Trạng thái hoạt động" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                          IsChecked="{Binding IsActivityStatusEnabled, Mode=TwoWay}" />
+                                        </Grid>
+
+                                        <Button Content="Đăng xuất" Command="{Binding LogoutCommand}" Height="36"
+                                                Background="{DynamicResource PrimaryBrush}" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{TemplateBinding Background}" CornerRadius="10" Padding="10,0">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <Button Width="52" Height="52" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Cursor="Hand" ToolTip="Trang cá nhân" Command="{Binding OpenMyProfileCommand}"
+                                Focusable="False" FocusVisualStyle="{x:Null}" Padding="0" Background="Transparent" BorderThickness="0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="999" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ClipToBounds="True">
+                                        <Grid>
+                                            <Ellipse Fill="{DynamicResource SurfaceBrush}" />
+
+                                            <Ellipse>
+                                                <Ellipse.Fill>
+                                                    <ImageBrush ImageSource="{Binding CurrentUserAvatarImage}" Stretch="UniformToFill" />
+                                                </Ellipse.Fill>
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CurrentUserAvatarImage}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+
+                                            <!-- Fallback: anonymous person icon when no avatar -->
+                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE77B;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CurrentUserAvatarImage}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
                         </Button>
-                        <Border Height="52" Background="#FFF9FAFB" CornerRadius="999">
-                            <TextBlock Text="U" FontWeight="SemiBold" Foreground="#FF111827" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
                     </UniformGrid>
 
                     <!-- Second icons row (4 buttons) -->
                     <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,14">
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE717;" FontSize="20" Foreground="#FF111827" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE717;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" FontSize="20" Foreground="#FF111827" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Kết bạn" Click="RightSidebarFriends_Click">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE716;" FontSize="20" Foreground="#FF111827" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE716;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                         <Button Style="{StaticResource RightSidebarIconButton}">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE840;" FontSize="20" Foreground="#FF111827" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE840;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                     </UniformGrid>
 
@@ -1372,7 +1714,7 @@
                             <!-- Members section (group chat only) -->
                             <StackPanel Visibility="{Binding SelectedConversation.IsGroup, Converter={StaticResource BoolToVis}}">
                                 <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
-                                    <TextBlock Text="Thành viên" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Thành viên" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
                                 </Border>
 
                                 <ListBox ItemsSource="{Binding Members}" BorderThickness="0" Background="Transparent"
@@ -1392,7 +1734,7 @@
                                             <Setter Property="Template">
                                                 <Setter.Value>
                                                     <ControlTemplate TargetType="ListBoxItem">
-                                                        <Border CornerRadius="12" Background="#FFFFFFFF" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="8">
+                                                        <Border CornerRadius="12" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8">
                                                             <ContentPresenter />
                                                         </Border>
                                                     </ControlTemplate>
@@ -1402,7 +1744,7 @@
                                     </ListBox.ItemContainerStyle>
                                 </ListBox>
 
-                                <Border Height="1" Background="#FFBFDBFE" Opacity="0.7" Margin="0,6,0,12" />
+                                <Border Height="1" Background="{DynamicResource BorderBrush}" Opacity="0.7" Margin="0,6,0,12" />
                             </StackPanel>
 
                             <!-- Docs section (toggle: Tài liệu | Link) -->
@@ -1443,11 +1785,11 @@
                                     <Button.Style>
                                         <Style TargetType="Button">
                                             <Setter Property="FontSize" Value="16" />
-                                            <Setter Property="Foreground" Value="#FF6B7280" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
                                             <Setter Property="FontWeight" Value="Normal" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding ShowRightLinks}" Value="True">
-                                                    <Setter Property="Foreground" Value="#FF1E3A8A" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
                                                     <Setter Property="FontWeight" Value="SemiBold" />
                                                     <Setter Property="TextBlock.TextDecorations" Value="Underline" />
                                                 </DataTrigger>
@@ -1467,7 +1809,7 @@
                                         HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Stretch">
                                     <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8" HorizontalAlignment="Stretch">
-                                        <TextBlock Text="Hình ảnh &amp; Video" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Hình ảnh &amp; Video" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
                                     </Border>
                                 </Button>
 
@@ -1490,7 +1832,7 @@
                                             <DataTemplate>
                                                 <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
                                                         Click="RightSidebarImage_Click">
-                                                    <Border Height="72" Width="72" CornerRadius="12" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" Margin="0,0,8,8">
+                                                    <Border Height="72" Width="72" CornerRadius="12" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,8,8">
                                                         <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
                                                     </Border>
                                                 </Button>
@@ -1504,7 +1846,7 @@
                                         HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Stretch">
                                     <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,6,0,8" HorizontalAlignment="Stretch">
-                                        <TextBlock Text="Tệp" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Tệp" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
                                     </Border>
                                 </Button>
 
@@ -1522,7 +1864,7 @@
                                         <DataTemplate>
                                             <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
                                                     Click="RightSidebarFile_Click">
-                                                <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                                                <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="48" />
@@ -1530,17 +1872,17 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Border Width="40" Height="40" CornerRadius="10" Background="#FFF9FAFB" BorderBrush="#FFBFDBFE" BorderThickness="1" VerticalAlignment="Center">
-                                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" FontSize="18" Foreground="#FF6B7280"
+                                                        <Border Width="40" Height="40" CornerRadius="10" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" VerticalAlignment="Center">
+                                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;" FontSize="18" Foreground="{DynamicResource TextSecondaryBrush}"
                                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                         </Border>
 
                                                         <StackPanel Grid.Column="1" Margin="10,0,10,0" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Title}" Foreground="#FF111827" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="Bấm để tải" Foreground="#FF6B7280" FontSize="12" />
+                                                            <TextBlock Text="{Binding Title}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="Bấm để tải" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
                                                         </StackPanel>
 
-                                                        <TextBlock Grid.Column="2" FontFamily="Segoe MDL2 Assets" Text="&#xE896;" Foreground="#FF2563EB" VerticalAlignment="Center" FontSize="16" />
+                                                        <TextBlock Grid.Column="2" FontFamily="Segoe MDL2 Assets" Text="&#xE896;" Foreground="{DynamicResource PrimaryBrush}" VerticalAlignment="Center" FontSize="16" />
                                                     </Grid>
                                                 </Border>
                                             </Button>
@@ -1552,7 +1894,7 @@
                             <!-- Links view -->
                             <StackPanel Visibility="{Binding ShowRightLinks, Converter={StaticResource BoolToVis}}">
                                 <Border Style="{StaticResource RightSidebarPillHeader}" Margin="0,0,0,8">
-                                    <TextBlock Text="Link" Foreground="#FF1E3A8A" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Link" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" />
                                 </Border>
 
                                 <ListBox ItemsSource="{Binding RightLinks}" BorderThickness="0" Background="Transparent"
@@ -1566,11 +1908,11 @@
                                     </ListBox.Resources>
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#FFFFFFFF" CornerRadius="12" BorderBrush="#FFBFDBFE" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                                            <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,8">
                                                 <TextBlock TextWrapping="Wrap" FontWeight="SemiBold">
                                                     <Hyperlink NavigateUri="{Binding Uri}"
                                                                RequestNavigate="Hyperlink_RequestNavigate"
-                                                               Foreground="#FF2563EB">
+                                                               Foreground="{DynamicResource PrimaryBrush}">
                                                         <Run Text="{Binding Text}" />
                                                     </Hyperlink>
                                                 </TextBlock>
@@ -1585,35 +1927,35 @@
         </Grid>
 
         <!-- In-app confirm bar (no separate window) -->
-        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="14"
+        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14"
                 Padding="12" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Bottom"
                 Panel.ZIndex="999"
                 Visibility="{Binding IsConfirmVisible, Converter={StaticResource BoolToVis}}">
             <DockPanel LastChildFill="True">
-                <TextBlock Text="{Binding ConfirmMessage}" Foreground="#FF111827" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ConfirmMessage}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
                     <Button Height="34" MinWidth="84" Margin="0,0,8,0"
-                            Background="#FF111827" BorderThickness="0" Cursor="Hand"
+                            Background="{DynamicResource PrimaryBrush}" BorderThickness="0" Cursor="Hand"
                             Command="{Binding ConfirmOkCommand}">
                         <TextBlock Text="{Binding ConfirmOkText}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
                     <Button Height="34" MinWidth="84"
-                            Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="1" Cursor="Hand"
+                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
                             Command="{Binding ConfirmCancelCommand}">
-                        <TextBlock Text="{Binding ConfirmCancelText}" Foreground="#FF111827" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ConfirmCancelText}" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
 
         <!-- In-app toast -->
-        <Border Background="White" BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="14"
+        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14"
                 Padding="10" Margin="16,0,16,72" HorizontalAlignment="Center" VerticalAlignment="Bottom"
                 Panel.ZIndex="998"
                 Visibility="{Binding IsToastVisible, Converter={StaticResource BoolToVis}}">
             <DockPanel>
                 <Border Width="6" CornerRadius="999" Background="{Binding ToastAccentBrush}" Margin="0,0,10,0" />
-                <TextBlock Text="{Binding ToastMessage}" Foreground="#FF111827" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ToastMessage}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
             </DockPanel>
         </Border>
     </Grid>

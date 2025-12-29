@@ -5,12 +5,15 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Google.Cloud.Firestore;
 using MessagingApp.Services;
+using ThreeMess.Services;
 using ThreeMess.Infrastructure;
 using ThreeMess.Models;
 
@@ -73,12 +76,32 @@ public sealed class MainViewModel : ObservableObject
     private readonly DispatcherTimer _typingIdleTimer;
 
     private bool _isFriendFinderMode;
+    private bool _isProfileMode;
+    private bool _isEditingMyProfile;
     private string _friendFinderSearchText = string.Empty;
     private bool _friendFinderIsBusy;
     private string _friendFinderStatusText = "Nhập email hoặc username để tìm người dùng.";
     private readonly DispatcherTimer _friendFinderSearchTimer;
     private UserSearchResultViewModel? _selectedFriendFinderUser;
     private UserProfileViewModel? _selectedProfile;
+
+    private ImageSource? _currentUserAvatarImage;
+    private string _currentUserAvatarText = "U";
+
+    private string _editBio = string.Empty;
+    private ImageSource? _editAvatarPreview;
+    private ImageSource? _editCoverPreview;
+    private string? _editAvatarDataUrl;
+    private string? _editCoverDataUrl;
+
+    private Rect _editAvatarViewbox = new(0, 0, 1, 1);
+    private Rect _editCoverViewbox = new(0, 0, 1, 1);
+    private double _editAvatarImageAspect = 1.0;
+    private double _editCoverImageAspect = 1.0;
+    private double _editCoverContainerAspect = 16.0 / 9.0;
+
+    private string? _selectedProfileAvatarRaw;
+    private string? _selectedProfileCoverRaw;
 
     private bool _rightImagesExpanded;
     private bool _rightFilesExpanded;
@@ -99,6 +122,10 @@ public sealed class MainViewModel : ObservableObject
     private string? _lastSelectedGroupConversationId;
 
     private bool _suppressSidebarSelectionHandling;
+
+    private bool _isDarkMode;
+    private bool _isActivityStatusEnabled = true;
+    private bool _suppressSettingsPersist;
 
     public ObservableCollection<object> SidebarItems { get; } = new();
     public ObservableCollection<MessageItemViewModel> Messages { get; } = new();
@@ -177,11 +204,13 @@ public sealed class MainViewModel : ObservableObject
 
             if (value is FriendItemViewModel f)
             {
+                IsProfileMode = false;
                 _lastSelectedFriendUserId = f.UserId;
                 _ = OpenChatWithFriendAsync(f);
             }
             else if (value is GroupChatItemViewModel g)
             {
+                IsProfileMode = false;
                 _lastSelectedGroupConversationId = g.ConversationId;
                 _ = OpenChatWithGroupAsync(g);
             }
@@ -232,6 +261,7 @@ public sealed class MainViewModel : ObservableObject
     public ICommand HideMessageLocallyCommand { get; }
     public ICommand OpenAddFriendCommand { get; }
     public ICommand OpenCreateGroupCommand { get; }
+    public ICommand GoHomeCommand { get; }
     public ICommand ShowFriendsCommand { get; }
     public ICommand ShowGroupsCommand { get; }
 
@@ -246,6 +276,13 @@ public sealed class MainViewModel : ObservableObject
     public ICommand AcceptFriendFinderRequestCommand { get; }
     public ICommand DeclineFriendFinderRequestCommand { get; }
 
+    public ICommand OpenMyProfileCommand { get; }
+    public ICommand BeginEditMyProfileCommand { get; }
+    public ICommand CancelEditMyProfileCommand { get; }
+    public ICommand SaveMyProfileCommand { get; }
+    public ICommand PickMyAvatarCommand { get; }
+    public ICommand PickMyCoverCommand { get; }
+
     public ICommand ConfirmOkCommand { get; }
     public ICommand ConfirmCancelCommand { get; }
 
@@ -253,6 +290,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand TogglePinConversationCommand { get; }
     public ICommand UpdatePinnedCommand { get; }
     public ICommand UpdateNotificationsCommand { get; }
+
+    public ICommand LogoutCommand { get; }
+
+    public event Action? LogoutRequested;
 
     public MainViewModel()
     {
@@ -307,6 +348,8 @@ public sealed class MainViewModel : ObservableObject
 
         OpenCreateGroupCommand = new RelayCommand(OpenCreateGroup);
 
+        GoHomeCommand = new RelayCommand(GoHome);
+
         ShowFriendsCommand = new RelayCommand(() => ShowGroups = false);
         ShowGroupsCommand = new RelayCommand(() => ShowGroups = true);
 
@@ -321,6 +364,13 @@ public sealed class MainViewModel : ObservableObject
         AcceptFriendFinderRequestCommand = new RelayCommand<object>(o => Forget(AcceptFriendFinderRequestAsync(o as UserSearchResultViewModel)), o => o is UserSearchResultViewModel);
         DeclineFriendFinderRequestCommand = new RelayCommand<object>(o => Forget(DeclineFriendFinderRequestAsync(o as UserSearchResultViewModel)), o => o is UserSearchResultViewModel);
 
+        OpenMyProfileCommand = new RelayCommand(() => Forget(OpenMyProfileAsync()));
+        BeginEditMyProfileCommand = new RelayCommand(BeginEditMyProfile, () => IsViewingOwnProfile && !IsEditingMyProfile);
+        CancelEditMyProfileCommand = new RelayCommand(CancelEditMyProfile, () => IsEditingMyProfile);
+        SaveMyProfileCommand = new RelayCommand(() => Forget(SaveMyProfileAsync()), () => IsEditingMyProfile);
+        PickMyAvatarCommand = new RelayCommand(() => Forget(PickMyAvatarAsync()), () => IsEditingMyProfile);
+        PickMyCoverCommand = new RelayCommand(() => Forget(PickMyCoverAsync()), () => IsEditingMyProfile);
+
         ConfirmOkCommand = new RelayCommand(() => Forget(ExecuteConfirmOkAsync()), () => IsConfirmVisible);
         ConfirmCancelCommand = new RelayCommand(() => HideConfirm());
 
@@ -329,8 +379,133 @@ public sealed class MainViewModel : ObservableObject
         UpdatePinnedCommand = new RelayCommand<object>(o => _ = UpdatePinnedAsync(o), o => o != null);
         UpdateNotificationsCommand = new RelayCommand<object>(o => _ = UpdateNotificationsAsync(o), o => o != null);
 
+        LogoutCommand = new RelayCommand(() => Forget(LogoutAsync()));
+
         _ = LoadFriendsAsync();
         _ = LoadGroupsAsync();
+
+        // Best-effort: preload current user's avatar for the top-right button.
+        Forget(RefreshCurrentUserAvatarAsync());
+
+        // Best-effort: load persisted settings (theme + presence visibility).
+        Forget(RefreshCurrentUserSettingsAsync());
+    }
+
+    public bool IsDarkMode
+    {
+        get => _isDarkMode;
+        set
+        {
+            if (!SetProperty(ref _isDarkMode, value)) return;
+            ApplyThemeFromSettings();
+            if (!_suppressSettingsPersist) Forget(PersistCurrentUserSettingsAsync());
+        }
+    }
+
+    public bool IsActivityStatusEnabled
+    {
+        get => _isActivityStatusEnabled;
+        set
+        {
+            if (!SetProperty(ref _isActivityStatusEnabled, value)) return;
+            if (!_suppressSettingsPersist) Forget(PersistCurrentUserSettingsAsync());
+
+            // Immediately reflect the toggle in Firestore presence.
+            Forget(UpdatePresenceAsync(true));
+        }
+    }
+
+    private void ApplyThemeFromSettings()
+    {
+        try
+        {
+            ThemeManager.ApplyTheme(IsDarkMode ? ThemeManager.ThemeMode.Dark : ThemeManager.ThemeMode.Light);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task RefreshCurrentUserSettingsAsync()
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            var data = await _friendsService.GetUserAsync(currentUserId);
+            if (data == null) return;
+
+            bool isDark = false;
+            if (data.TryGetValue("theme", out var themeObj) && themeObj != null)
+            {
+                isDark = string.Equals(themeObj.ToString(), "dark", StringComparison.OrdinalIgnoreCase);
+            }
+
+            bool showActivity = true;
+            if (data.TryGetValue("showOnlineStatus", out var showObj) && showObj is bool b)
+            {
+                showActivity = b;
+            }
+
+            _suppressSettingsPersist = true;
+            try
+            {
+                IsDarkMode = isDark;
+                IsActivityStatusEnabled = showActivity;
+            }
+            finally
+            {
+                _suppressSettingsPersist = false;
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task PersistCurrentUserSettingsAsync()
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            await _friendsService.UpdateUserSettingsAsync(
+                currentUserId,
+                theme: IsDarkMode ? "dark" : "light",
+                showOnlineStatus: IsActivityStatusEnabled);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            await UpdatePresenceAsync(false);
+        }
+        catch { }
+
+        try
+        {
+            await _authService.SignOut();
+        }
+        catch { }
+
+        try
+        {
+            Application.Current.Dispatcher.Invoke(() => LogoutRequested?.Invoke());
+        }
+        catch
+        {
+            LogoutRequested?.Invoke();
+        }
     }
 
     private enum ConfirmKind
@@ -491,6 +666,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 if (_isFriendFinderMode)
                 {
+                    IsProfileMode = false;
                     FriendFinderSearchText = string.Empty;
                     FriendFinderResults.Clear();
                     SelectedFriendFinderUser = null;
@@ -499,6 +675,125 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
         }
+    }
+
+    private void GoHome()
+    {
+        // Return to the main chat UI from any alternate mode.
+        if (IsEditingMyProfile)
+        {
+            try { CancelEditMyProfile(); } catch { }
+        }
+
+        IsFriendFinderMode = false;
+        IsProfileMode = false;
+
+        // Clear any profile/friend-finder context so the center panel doesn't stay in profile mode.
+        SelectedFriendFinderUser = null;
+        SelectedProfile = null;
+    }
+
+    public bool IsProfileMode
+    {
+        get => _isProfileMode;
+        set
+        {
+            if (SetProperty(ref _isProfileMode, value))
+            {
+                if (_isProfileMode)
+                {
+                    // Keep friend-finder UI off when user explicitly opens their own profile.
+                    IsFriendFinderMode = false;
+                }
+                else
+                {
+                    IsEditingMyProfile = false;
+                }
+            }
+        }
+    }
+
+    public bool IsViewingOwnProfile
+    {
+        get
+        {
+            var currentUserId = _authService.CurrentUserId;
+            var profileUserId = SelectedProfile?.UserId;
+            return !string.IsNullOrWhiteSpace(currentUserId)
+                   && !string.IsNullOrWhiteSpace(profileUserId)
+                   && string.Equals(currentUserId, profileUserId, StringComparison.Ordinal);
+        }
+    }
+
+    public bool IsEditingMyProfile
+    {
+        get => _isEditingMyProfile;
+        private set
+        {
+            if (SetProperty(ref _isEditingMyProfile, value))
+            {
+                try { ((RelayCommand)BeginEditMyProfileCommand).RaiseCanExecuteChanged(); } catch { }
+                try { ((RelayCommand)CancelEditMyProfileCommand).RaiseCanExecuteChanged(); } catch { }
+                try { ((RelayCommand)SaveMyProfileCommand).RaiseCanExecuteChanged(); } catch { }
+                try { ((RelayCommand)PickMyAvatarCommand).RaiseCanExecuteChanged(); } catch { }
+                try { ((RelayCommand)PickMyCoverCommand).RaiseCanExecuteChanged(); } catch { }
+            }
+        }
+    }
+
+    public ImageSource? CurrentUserAvatarImage
+    {
+        get => _currentUserAvatarImage;
+        private set => SetProperty(ref _currentUserAvatarImage, value);
+    }
+
+    public string CurrentUserAvatarText
+    {
+        get => _currentUserAvatarText;
+        private set => SetProperty(ref _currentUserAvatarText, value);
+    }
+
+    public ImageSource? EditAvatarPreview
+    {
+        get => _editAvatarPreview;
+        private set => SetProperty(ref _editAvatarPreview, value);
+    }
+
+    public ImageSource? EditCoverPreview
+    {
+        get => _editCoverPreview;
+        private set => SetProperty(ref _editCoverPreview, value);
+    }
+
+    public Rect EditAvatarViewbox
+    {
+        get => _editAvatarViewbox;
+        set => SetProperty(ref _editAvatarViewbox, ClampViewbox(value));
+    }
+
+    public Rect EditCoverViewbox
+    {
+        get => _editCoverViewbox;
+        set => SetProperty(ref _editCoverViewbox, ClampViewbox(value));
+    }
+
+    public void UpdateEditCoverContainerSize(double width, double height)
+    {
+        if (width <= 1 || height <= 1) return;
+        var aspect = width / height;
+        if (double.IsNaN(aspect) || double.IsInfinity(aspect) || aspect <= 0) return;
+
+        _editCoverContainerAspect = aspect;
+        if (!IsEditingMyProfile) return;
+
+        // Recompute viewbox (keep current center) when container aspect changes.
+        RecomputeCoverViewbox(keepCenter: true);
+    }
+
+    public string EditBio
+    {
+        get => _editBio;
+        set => SetProperty(ref _editBio, value);
     }
 
     public string FriendFinderSearchText
@@ -546,6 +841,381 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _selectedProfile;
         private set => SetProperty(ref _selectedProfile, value);
+    }
+
+    private async Task OpenMyProfileAsync()
+    {
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        IsProfileMode = true;
+        SelectedFriendFinderUser = null;
+        await LoadProfileAsync(currentUserId);
+    }
+
+    private void BeginEditMyProfile()
+    {
+        if (!IsViewingOwnProfile || SelectedProfile == null) return;
+
+        IsEditingMyProfile = true;
+        EditBio = SelectedProfile.About ?? string.Empty;
+        EditAvatarPreview = SelectedProfile.AvatarImage;
+        EditCoverPreview = SelectedProfile.CoverImage;
+
+        _editAvatarDataUrl = null;
+        _editCoverDataUrl = null;
+
+        // Initialize viewboxes (for drag-to-position).
+        _editAvatarImageAspect = TryGetAspectFromImageSource(EditAvatarPreview) ?? 1.0;
+        _editCoverImageAspect = TryGetAspectFromImageSource(EditCoverPreview) ?? 1.0;
+        EditAvatarViewbox = ComputeViewbox(_editAvatarImageAspect, containerAspect: 1.0);
+        EditCoverViewbox = ComputeViewbox(_editCoverImageAspect, _editCoverContainerAspect);
+    }
+
+    private void CancelEditMyProfile()
+    {
+        IsEditingMyProfile = false;
+        _editAvatarDataUrl = null;
+        _editCoverDataUrl = null;
+
+        // revert previews to current loaded profile
+        if (SelectedProfile != null)
+        {
+            EditBio = SelectedProfile.About ?? string.Empty;
+            EditAvatarPreview = SelectedProfile.AvatarImage;
+            EditCoverPreview = SelectedProfile.CoverImage;
+
+            _editAvatarImageAspect = TryGetAspectFromImageSource(EditAvatarPreview) ?? 1.0;
+            _editCoverImageAspect = TryGetAspectFromImageSource(EditCoverPreview) ?? 1.0;
+            EditAvatarViewbox = ComputeViewbox(_editAvatarImageAspect, containerAspect: 1.0);
+            EditCoverViewbox = ComputeViewbox(_editCoverImageAspect, _editCoverContainerAspect);
+        }
+    }
+
+    private async Task SaveMyProfileAsync()
+    {
+        if (!IsViewingOwnProfile) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        try
+        {
+            // If we're editing, crop according to the current drag-selected viewbox.
+            var avatarSource = _editAvatarDataUrl ?? _selectedProfileAvatarRaw;
+            var coverSource = _editCoverDataUrl ?? _selectedProfileCoverRaw;
+
+            var avatarToSave = TryCropAndEncodeIfDataUrl(avatarSource, EditAvatarViewbox, maxPixels: 256, qualityLevel: 85) ?? avatarSource;
+            var coverToSave = TryCropAndEncodeIfDataUrl(coverSource, EditCoverViewbox, maxPixels: 1280, qualityLevel: 85) ?? coverSource;
+
+            var bioToSave = (EditBio ?? string.Empty).Trim();
+
+            var (success, message) = await _friendsService.UpdateUserProfileAsync(currentUserId, avatarToSave, coverToSave, bioToSave);
+            ShowToast(message, success ? "success" : "error");
+            if (!success) return;
+
+            IsEditingMyProfile = false;
+
+            // Refresh profile + top-right avatar from server.
+            await LoadProfileAsync(currentUserId);
+            await RefreshCurrentUserAvatarAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private async Task PickMyAvatarAsync()
+    {
+        var path = PickImageFilePath();
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            var dataUrl = await Task.Run(() => EncodeImageToJpegDataUrl(path, maxPixels: 256, qualityLevel: 85));
+            if (string.IsNullOrWhiteSpace(dataUrl))
+            {
+                ShowToast("Không thể đọc ảnh.", "error");
+                return;
+            }
+
+            _editAvatarDataUrl = dataUrl;
+            EditAvatarPreview = TryDecodeDataUrlOrUriToImageSource(dataUrl);
+
+            _editAvatarImageAspect = TryGetAspectFromImageSource(EditAvatarPreview) ?? 1.0;
+            EditAvatarViewbox = ComputeViewbox(_editAvatarImageAspect, containerAspect: 1.0);
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private async Task PickMyCoverAsync()
+    {
+        var path = PickImageFilePath();
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            var dataUrl = await Task.Run(() => EncodeImageToJpegDataUrl(path, maxPixels: 1280, qualityLevel: 85));
+            if (string.IsNullOrWhiteSpace(dataUrl))
+            {
+                ShowToast("Không thể đọc ảnh.", "error");
+                return;
+            }
+
+            _editCoverDataUrl = dataUrl;
+            EditCoverPreview = TryDecodeDataUrlOrUriToImageSource(dataUrl);
+
+            _editCoverImageAspect = TryGetAspectFromImageSource(EditCoverPreview) ?? 1.0;
+            EditCoverViewbox = ComputeViewbox(_editCoverImageAspect, _editCoverContainerAspect);
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private static string? PickImageFilePath()
+    {
+        try
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Chọn ảnh",
+                Filter = "Image files|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif|All files|*.*",
+                Multiselect = false
+            };
+
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? EncodeImageToJpegDataUrl(string filePath, int maxPixels, int qualityLevel)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;
+
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+
+        // Downscale by bounding box: cap the larger dimension to maxPixels.
+        bmp.UriSource = new Uri(filePath, UriKind.Absolute);
+        bmp.DecodePixelWidth = maxPixels;
+        bmp.EndInit();
+        bmp.Freeze();
+
+        var encoder = new JpegBitmapEncoder { QualityLevel = Math.Clamp(qualityLevel, 30, 95) };
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+
+        using var ms = new MemoryStream();
+        encoder.Save(ms);
+        var base64 = Convert.ToBase64String(ms.ToArray());
+        return "data:image/jpeg;base64," + base64;
+    }
+
+    private static double? TryGetAspectFromImageSource(ImageSource? src)
+    {
+        try
+        {
+            if (src is BitmapSource bs)
+            {
+                if (bs.PixelWidth <= 0 || bs.PixelHeight <= 0) return null;
+                return bs.PixelWidth / (double)bs.PixelHeight;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private static Rect ClampViewbox(Rect vb)
+    {
+        double w = vb.Width <= 0 ? 1 : vb.Width;
+        double h = vb.Height <= 0 ? 1 : vb.Height;
+        if (w > 1) w = 1;
+        if (h > 1) h = 1;
+
+        double x = vb.X;
+        double y = vb.Y;
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        if (x > 1 - w) x = 1 - w;
+        if (y > 1 - h) y = 1 - h;
+        return new Rect(x, y, w, h);
+    }
+
+    private static Rect ComputeViewbox(double imageAspect, double containerAspect)
+    {
+        if (imageAspect <= 0 || containerAspect <= 0)
+        {
+            return new Rect(0, 0, 1, 1);
+        }
+
+        // UniformToFill-style crop: keep the largest possible portion without empty bars.
+        if (imageAspect > containerAspect)
+        {
+            // Image is wider -> crop left/right
+            double fracW = containerAspect / imageAspect;
+            if (fracW > 1) fracW = 1;
+            double x = (1 - fracW) / 2;
+            return new Rect(x, 0, fracW, 1);
+        }
+
+        // Image is taller -> crop top/bottom
+        double fracH = imageAspect / containerAspect;
+        if (fracH > 1) fracH = 1;
+        double y = (1 - fracH) / 2;
+        return new Rect(0, y, 1, fracH);
+    }
+
+    private void RecomputeCoverViewbox(bool keepCenter)
+    {
+        var current = EditCoverViewbox;
+        var next = ComputeViewbox(_editCoverImageAspect, _editCoverContainerAspect);
+
+        if (!keepCenter)
+        {
+            EditCoverViewbox = next;
+            return;
+        }
+
+        double cx = current.X + current.Width / 2;
+        double cy = current.Y + current.Height / 2;
+        double nx = cx - next.Width / 2;
+        double ny = cy - next.Height / 2;
+        EditCoverViewbox = ClampViewbox(new Rect(nx, ny, next.Width, next.Height));
+    }
+
+    private static string? TryCropAndEncodeIfDataUrl(string? dataUrl, Rect viewbox, int maxPixels, int qualityLevel)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dataUrl)) return null;
+            if (!dataUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return null;
+            if (viewbox.Width <= 0 || viewbox.Height <= 0) return null;
+
+            var bmp = DecodeDataUrlToBitmapSource(dataUrl);
+            if (bmp == null) return null;
+
+            // Crop in pixel space
+            int pw = bmp.PixelWidth;
+            int ph = bmp.PixelHeight;
+            int x = (int)Math.Round(viewbox.X * pw);
+            int y = (int)Math.Round(viewbox.Y * ph);
+            int w = (int)Math.Round(viewbox.Width * pw);
+            int h = (int)Math.Round(viewbox.Height * ph);
+
+            if (w < 1) w = 1;
+            if (h < 1) h = 1;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            if (x + w > pw) w = pw - x;
+            if (y + h > ph) h = ph - y;
+            if (w < 1 || h < 1) return null;
+
+            var cropped = new CroppedBitmap(bmp, new Int32Rect(x, y, w, h));
+            cropped.Freeze();
+
+            var resized = ResizeBitmapMaxPixels(cropped, maxPixels);
+            return EncodeBitmapToJpegDataUrl(resized, qualityLevel);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static BitmapSource? DecodeDataUrlToBitmapSource(string dataUrl)
+    {
+        try
+        {
+            int idx = dataUrl.IndexOf("base64,", StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return null;
+            string b64 = dataUrl[(idx + "base64,".Length)..];
+            var bytes = Convert.FromBase64String(b64);
+            using var ms = new MemoryStream(bytes);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.StreamSource = ms;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static BitmapSource ResizeBitmapMaxPixels(BitmapSource src, int maxPixels)
+    {
+        if (src.PixelWidth <= 0 || src.PixelHeight <= 0) return src;
+        int maxDim = Math.Max(src.PixelWidth, src.PixelHeight);
+        if (maxDim <= maxPixels) return src;
+
+        double scale = maxPixels / (double)maxDim;
+        var tb = new TransformedBitmap(src, new ScaleTransform(scale, scale));
+        tb.Freeze();
+        return tb;
+    }
+
+    private static string? EncodeBitmapToJpegDataUrl(BitmapSource bmp, int qualityLevel)
+    {
+        try
+        {
+            var encoder = new JpegBitmapEncoder { QualityLevel = Math.Clamp(qualityLevel, 30, 95) };
+            encoder.Frames.Add(BitmapFrame.Create(bmp));
+            using var ms = new MemoryStream();
+            encoder.Save(ms);
+            return "data:image/jpeg;base64," + Convert.ToBase64String(ms.ToArray());
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task RefreshCurrentUserAvatarAsync()
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            var data = await _friendsService.GetUserAsync(currentUserId);
+            if (data == null) return;
+
+            string display = TryGetString(data, "fullName", "username", "email");
+            if (string.IsNullOrWhiteSpace(display)) display = "User";
+
+            string avatarValue = TryGetString(data, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
+            var avatarImg = TryDecodeDataUrlOrUriToImageSource(avatarValue);
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                CurrentUserAvatarText = string.IsNullOrWhiteSpace(display) ? "U" : display.Substring(0, 1).ToUpperInvariant();
+                CurrentUserAvatarImage = avatarImg;
+            });
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     private async Task SearchFriendFinderAsync()
@@ -811,7 +1481,7 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task LoadProfileAsync(string userId)
     {
-        if (!_isFriendFinderMode) return;
+        if (!_isFriendFinderMode && !_isProfileMode) return;
         if (string.IsNullOrWhiteSpace(userId)) return;
 
         var profile = SelectedProfile;
@@ -848,6 +1518,9 @@ public sealed class MainViewModel : ObservableObject
             string avatarValue = TryGetString(data, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
             string coverValue = TryGetString(data, "coverDataUrl", "coverPhotoDataUrl", "coverUrl", "cover");
 
+            _selectedProfileAvatarRaw = avatarValue;
+            _selectedProfileCoverRaw = coverValue;
+
             var avatarImg = TryDecodeDataUrlOrUriToImageSource(avatarValue);
             var coverImg = TryDecodeDataUrlOrUriToImageSource(coverValue);
 
@@ -864,6 +1537,10 @@ public sealed class MainViewModel : ObservableObject
                 profile.CoverImage = coverImg;
                 profile.StatusText = string.Empty;
             });
+
+            // Notify dependent UI bits (self edit button visibility).
+            OnPropertyChanged(nameof(IsViewingOwnProfile));
+            try { ((RelayCommand)BeginEditMyProfileCommand).RaiseCanExecuteChanged(); } catch { }
         }
         catch (Exception ex)
         {
@@ -881,7 +1558,9 @@ public sealed class MainViewModel : ObservableObject
         {
             string? currentUserId = _authService.CurrentUserId;
             if (string.IsNullOrWhiteSpace(currentUserId)) return;
-            await _friendsService.UpdatePresenceAsync(currentUserId, isOnline);
+            // If user disabled activity status, always publish offline even while active.
+            bool publishOnline = isOnline && IsActivityStatusEnabled;
+            await _friendsService.UpdatePresenceAsync(currentUserId, publishOnline);
         }
         catch
         {

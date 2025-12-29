@@ -20,6 +20,14 @@ public partial class MainWindow : Window
 {
     private DispatcherTimer? _presenceTimer;
 
+    private bool _draggingCover;
+    private Point _coverDragStart;
+    private Rect _coverViewboxStart;
+
+    private bool _draggingAvatar;
+    private Point _avatarDragStart;
+    private Rect _avatarViewboxStart;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -29,6 +37,19 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             UpdateEmptyState();
+
+            vm.LogoutRequested += () =>
+            {
+                try { _presenceTimer?.Stop(); } catch { }
+                try
+                {
+                    var w = new LoginWindow();
+                    w.Show();
+                }
+                catch { }
+
+                try { Close(); } catch { }
+            };
 
             _ = vm.UpdatePresenceAsync(true);
 
@@ -73,6 +94,11 @@ public partial class MainWindow : Window
         };
     }
 
+    private void SettingsPopup_Closed(object sender, System.EventArgs e)
+    {
+        try { SettingsToggle.IsChecked = false; } catch { }
+    }
+
     private void UpdateEmptyState()
     {
         if (DataContext is not MainViewModel vm) return;
@@ -100,6 +126,120 @@ public partial class MainWindow : Window
         {
             vm.ToggleFriendFinderModeCommand.Execute(null);
         }
+    }
+
+    private static double Clamp(double v, double min, double max)
+    {
+        if (v < min) return min;
+        if (v > max) return max;
+        return v;
+    }
+
+    private void EditCoverSurface_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (sender is not FrameworkElement fe) return;
+        vm.UpdateEditCoverContainerSize(fe.ActualWidth, fe.ActualHeight);
+    }
+
+    private void EditCoverSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!vm.IsEditingMyProfile) return;
+        if (sender is not FrameworkElement fe) return;
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+
+        _draggingCover = true;
+        _coverDragStart = e.GetPosition(fe);
+        _coverViewboxStart = vm.EditCoverViewbox;
+        fe.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void EditCoverSurface_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_draggingCover) return;
+        if (DataContext is not MainViewModel vm) return;
+        if (sender is not FrameworkElement fe) return;
+
+        double w = fe.ActualWidth;
+        double h = fe.ActualHeight;
+        if (w <= 1 || h <= 1) return;
+
+        var pos = e.GetPosition(fe);
+        double dx = pos.X - _coverDragStart.X;
+        double dy = pos.Y - _coverDragStart.Y;
+
+        var vb = _coverViewboxStart;
+
+        // Drag image -> move viewbox opposite direction.
+        double newX = vb.X - (dx / w) * vb.Width;
+        double newY = vb.Y - (dy / h) * vb.Height;
+
+        newX = Clamp(newX, 0, 1 - vb.Width);
+        newY = Clamp(newY, 0, 1 - vb.Height);
+
+        vm.EditCoverViewbox = new Rect(newX, newY, vb.Width, vb.Height);
+    }
+
+    private void EditCoverSurface_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_draggingCover) return;
+        _draggingCover = false;
+        if (sender is FrameworkElement fe)
+        {
+            try { fe.ReleaseMouseCapture(); } catch { }
+        }
+        e.Handled = true;
+    }
+
+    private void EditAvatarSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!vm.IsEditingMyProfile) return;
+        if (sender is not FrameworkElement fe) return;
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+
+        _draggingAvatar = true;
+        _avatarDragStart = e.GetPosition(fe);
+        _avatarViewboxStart = vm.EditAvatarViewbox;
+        fe.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void EditAvatarSurface_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_draggingAvatar) return;
+        if (DataContext is not MainViewModel vm) return;
+        if (sender is not FrameworkElement fe) return;
+
+        double w = fe.ActualWidth;
+        double h = fe.ActualHeight;
+        if (w <= 1 || h <= 1) return;
+
+        var pos = e.GetPosition(fe);
+        double dx = pos.X - _avatarDragStart.X;
+        double dy = pos.Y - _avatarDragStart.Y;
+
+        var vb = _avatarViewboxStart;
+
+        double newX = vb.X - (dx / w) * vb.Width;
+        double newY = vb.Y - (dy / h) * vb.Height;
+        newX = Clamp(newX, 0, 1 - vb.Width);
+        newY = Clamp(newY, 0, 1 - vb.Height);
+
+        vm.EditAvatarViewbox = new Rect(newX, newY, vb.Width, vb.Height);
+    }
+
+    private void EditAvatarSurface_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_draggingAvatar) return;
+        _draggingAvatar = false;
+        if (sender is FrameworkElement fe)
+        {
+            try { fe.ReleaseMouseCapture(); } catch { }
+        }
+        e.Handled = true;
     }
 
     private async void AttachButton_Click(object sender, RoutedEventArgs e)

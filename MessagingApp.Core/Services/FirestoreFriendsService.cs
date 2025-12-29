@@ -503,6 +503,83 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
+        /// Update user's public profile fields.
+        /// Writes: bio, avatarDataUrl, coverDataUrl
+        /// </summary>
+        public async Task<(bool success, string message)> UpdateUserProfileAsync(
+            string userId,
+            string? avatarDataUrl,
+            string? coverDataUrl,
+            string? bio)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return (false, "Thiếu userId.");
+                }
+
+                var updates = new Dictionary<string, object>
+                {
+                    { "bio", (bio ?? string.Empty).Trim() },
+                    { "updatedAt", FieldValue.ServerTimestamp }
+                };
+
+                // Only overwrite images if provided; otherwise keep existing.
+                if (!string.IsNullOrWhiteSpace(avatarDataUrl))
+                {
+                    updates["avatarDataUrl"] = avatarDataUrl;
+                }
+
+                if (!string.IsNullOrWhiteSpace(coverDataUrl))
+                {
+                    updates["coverDataUrl"] = coverDataUrl;
+                }
+
+                var docRef = _db.Collection("users").Document(userId);
+                await docRef.SetAsync(updates, SetOptions.MergeAll);
+
+                return (true, "Đã cập nhật trang cá nhân.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Update user's client settings.
+        /// Writes (merge): theme ("light"/"dark"), showOnlineStatus (bool)
+        /// </summary>
+        public async Task UpdateUserSettingsAsync(string userId, string? theme, bool? showOnlineStatus)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(userId)) return;
+
+                var updates = new Dictionary<string, object>();
+                if (!string.IsNullOrWhiteSpace(theme)) updates["theme"] = theme;
+                if (showOnlineStatus.HasValue) updates["showOnlineStatus"] = showOnlineStatus.Value;
+                if (updates.Count == 0) return;
+
+                var docRef = _db.Collection("users").Document(userId);
+
+                try
+                {
+                    await docRef.UpdateAsync(updates);
+                }
+                catch
+                {
+                    await docRef.SetAsync(updates, SetOptions.MergeAll);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating user settings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Count number of friends for a user.
         /// </summary>
         public async Task<int> GetFriendsCountAsync(string userId)

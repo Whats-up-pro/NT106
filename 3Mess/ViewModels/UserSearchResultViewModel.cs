@@ -1,4 +1,5 @@
 using ThreeMess.Infrastructure;
+using System.Windows.Media;
 
 namespace ThreeMess.ViewModels;
 
@@ -8,6 +9,7 @@ public sealed class UserSearchResultViewModel : ObservableObject
     private string _displayName = string.Empty;
     private string _subtitle = string.Empty;
     private string _avatarText = "?";
+    private ImageSource? _avatarImage;
     private bool _isFriend;
     private bool _isRequestPending;
     private bool _isSelf;
@@ -36,6 +38,12 @@ public sealed class UserSearchResultViewModel : ObservableObject
     {
         get => _avatarText;
         set => SetProperty(ref _avatarText, value);
+    }
+
+    public ImageSource? AvatarImage
+    {
+        get => _avatarImage;
+        set => SetProperty(ref _avatarImage, value);
     }
 
     public bool IsFriend

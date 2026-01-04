@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Input;
 using MessagingApp.Services;
 using ThreeMess.Infrastructure;
@@ -20,6 +22,8 @@ public sealed class AddFriendViewModel : ObservableObject
     private string _statusText = "";
     private string _requestsStatusText = "";
     private bool _isBusy;
+
+    private readonly Dictionary<string, ImageSource?> _userAvatarCache = new(StringComparer.Ordinal);
 
     public ObservableCollection<UserSearchResultViewModel> Results { get; } = new();
     public ObservableCollection<FriendRequestItemViewModel> PendingRequests { get; } = new();
@@ -115,6 +119,89 @@ public sealed class AddFriendViewModel : ObservableObject
         RequestsStatusText = "";
     }
 
+    private static string TryGetString(Dictionary<string, object> d, params string[] keys)
+    {
+        foreach (var k in keys)
+        {
+            if (d.TryGetValue(k, out var v) && v != null)
+            {
+                var s = v.ToString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+        }
+        return string.Empty;
+    }
+
+    private static ImageSource? TryDecodeDataUrlOrUriToImageSource(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        if (value.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var comma = value.IndexOf(",", StringComparison.Ordinal);
+                if (comma < 0) return null;
+                var b64 = value[(comma + 1)..];
+                var bytes = Convert.FromBase64String(b64);
+
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.StreamSource = new System.IO.MemoryStream(bytes);
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.UriSource = uri;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<ImageSource?> ResolveUserAvatarImageAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return null;
+        if (_userAvatarCache.TryGetValue(userId, out var cached)) return cached;
+
+        try
+        {
+            var data = await _friendsService.GetUserAsync(userId);
+            if (data != null)
+            {
+                string avatarValue = TryGetString(data, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
+                var img = TryDecodeDataUrlOrUriToImageSource(avatarValue);
+                _userAvatarCache[userId] = img;
+                return img;
+            }
+        }
+        catch { }
+
+        _userAvatarCache[userId] = null;
+        return null;
+    }
+
     public void OnLoaded()
     {
         _ = LoadPendingRequestsAsync();
@@ -153,17 +240,26 @@ public sealed class AddFriendViewModel : ObservableObject
                         ? $"@{username}" + (!string.IsNullOrWhiteSpace(email) ? $" • {email}" : "")
                         : email;
 
+                    string avatarValue = TryGetString(d, "fromUserAvatarDataUrl", "fromUserAvatar", "fromUserAvatarUrl", "fromUserPhotoUrl");
+
                     return new FriendRequestItemViewModel
                     {
                         RequestId = requestId,
                         FromUserId = fromUserId,
                         DisplayName = display,
                         Subtitle = subtitle,
-                        AvatarText = string.IsNullOrWhiteSpace(display) ? "?" : display.Substring(0, 1).ToUpperInvariant()
+                        AvatarText = string.IsNullOrWhiteSpace(display) ? "?" : display.Substring(0, 1).ToUpperInvariant(),
+                        AvatarImage = TryDecodeDataUrlOrUriToImageSource(avatarValue)
                     };
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.RequestId) && !string.IsNullOrWhiteSpace(x.FromUserId))
                 .ToList();
+
+            foreach (var r in mapped)
+            {
+                if (r.AvatarImage != null) continue;
+                r.AvatarImage = await ResolveUserAvatarImageAsync(r.FromUserId);
+            }
 
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -217,6 +313,8 @@ public sealed class AddFriendViewModel : ObservableObject
                     string username = d.TryGetValue("username", out var un) ? un?.ToString() ?? string.Empty : string.Empty;
                     string fullName = d.TryGetValue("fullName", out var fn) ? fn?.ToString() ?? string.Empty : string.Empty;
 
+                    string avatarValue = TryGetString(d, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
+
                     string display = string.IsNullOrWhiteSpace(fullName)
                         ? (string.IsNullOrWhiteSpace(username) ? (string.IsNullOrWhiteSpace(email) ? "(Không tên)" : email) : username)
                         : fullName;
@@ -230,11 +328,18 @@ public sealed class AddFriendViewModel : ObservableObject
                         UserId = id,
                         DisplayName = display,
                         Subtitle = subtitle,
-                        AvatarText = string.IsNullOrWhiteSpace(display) ? "?" : display.Substring(0, 1).ToUpperInvariant()
+                        AvatarText = string.IsNullOrWhiteSpace(display) ? "?" : display.Substring(0, 1).ToUpperInvariant(),
+                        AvatarImage = TryDecodeDataUrlOrUriToImageSource(avatarValue)
                     };
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.UserId))
                 .ToList();
+
+            foreach (var r in mapped)
+            {
+                if (r.AvatarImage != null) continue;
+                r.AvatarImage = await ResolveUserAvatarImageAsync(r.UserId);
+            }
 
             Application.Current.Dispatcher.Invoke(() =>
             {

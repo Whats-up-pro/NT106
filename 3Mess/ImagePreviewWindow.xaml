@@ -6,7 +6,7 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ShowInTaskbar="False">
+    ShowInTaskbar="False" Icon="{DynamicResource AppMark}">
     <Grid x:Name="Backdrop" Background="Transparent" MouseDown="Backdrop_MouseDown">
         <Border x:Name="ContentHost" Background="#FFF5F6F8" CornerRadius="14" BorderBrush="#1F000000" BorderThickness="1"
                 Width="920" Height="680" MaxWidth="920" MaxHeight="680"

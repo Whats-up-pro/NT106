@@ -6,7 +6,7 @@
         xmlns:vm="clr-namespace:ThreeMess.ViewModels"
         mc:Ignorable="d"
         Title="Đăng ký" Height="540" Width="720" WindowStartupLocation="CenterScreen"
-        Background="#FFF5F6F8" Opacity="0">
+    Background="#FFF5F6F8" Opacity="0" Icon="{DynamicResource AppMark}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -96,9 +96,7 @@
         <Border Grid.Column="1" Background="Transparent" CornerRadius="18" Padding="26">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Grid Width="220" Height="220" Margin="0,0,0,12">
-                    <Ellipse Fill="#00000000" />
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8BD;" FontSize="86" Foreground="#FF111827"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Image Source="{DynamicResource AppMark}" Stretch="Uniform" />
                 </Grid>
                 <TextBlock Text="3Mess" FontSize="38" FontWeight="SemiBold" Foreground="#FF111827" HorizontalAlignment="Center" />
                 <TextBlock Text="Simple. Fast. Real-time." Foreground="#FF6B7280" FontSize="13" HorizontalAlignment="Center" Margin="0,6,0,0" />

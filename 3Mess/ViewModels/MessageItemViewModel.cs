@@ -111,6 +111,7 @@ public sealed class MessageItemViewModel : ObservableObject
     }
 
     public string SenderAvatarText { get; init; } = "?";
+    public ImageSource? SenderAvatarImage { get; init; }
     public string TimeText => Time.ToString("HH:mm");
 
     public string OutgoingStatusText

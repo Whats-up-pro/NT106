@@ -4,6 +4,7 @@ using Google.Cloud.Firestore;
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace MessagingApp.Config
 {
@@ -53,6 +54,92 @@ namespace MessagingApp.Config
                 }
                 return ProjectId + ".appspot.com";
             }
+        }
+
+        /// <summary>
+        /// Firebase Web API Key (used for client-side email/password sign-in via Identity Toolkit REST API).
+        /// Set via env var FIREBASE_WEB_API_KEY (or FIREBASE_API_KEY).
+        /// </summary>
+        public static string? WebApiKey
+        {
+            get
+            {
+                // 1) Prefer a local config file shipped with the app
+                //    so end users don't need to set environment variables per machine.
+                var fromFile = TryLoadWebApiKeyFromClientConfig();
+                if (!string.IsNullOrWhiteSpace(fromFile))
+                {
+                    return fromFile;
+                }
+
+                // 2) Fallback to environment variables (useful for dev/test)
+                string? key = Environment.GetEnvironmentVariable("FIREBASE_WEB_API_KEY");
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    key = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
+                }
+
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    return null;
+                }
+
+                return key.Trim();
+            }
+        }
+
+        private static string? TryLoadWebApiKeyFromClientConfig()
+        {
+            const string fileName = "firebase-client-config.json";
+
+            try
+            {
+                var baseDir = AppContext.BaseDirectory;
+                var candidates = new List<string>
+                {
+                    Path.Combine(baseDir, "Config", fileName),
+                    Path.Combine(baseDir, fileName),
+                };
+
+                DirectoryInfo? dir = new DirectoryInfo(baseDir);
+                for (int i = 0; i < 8 && dir != null; i++)
+                {
+                    candidates.Add(Path.Combine(dir.FullName, "Config", fileName));
+                    candidates.Add(Path.Combine(dir.FullName, "MessagingApp", "Config", fileName));
+                    candidates.Add(Path.Combine(dir.FullName, "MessagingApp.Core", "Config", fileName));
+                    candidates.Add(Path.Combine(dir.FullName, "3Mess", "Config", fileName));
+                    dir = dir.Parent;
+                }
+
+                foreach (var path in candidates)
+                {
+                    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                        continue;
+
+                    var json = File.ReadAllText(path);
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    // Accept either "webApiKey" or "apiKey"
+                    if (root.TryGetProperty("webApiKey", out var webApiKeyProp))
+                    {
+                        var value = webApiKeyProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                    }
+
+                    if (root.TryGetProperty("apiKey", out var apiKeyProp))
+                    {
+                        var value = apiKeyProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                    }
+                }
+            }
+            catch
+            {
+                // ignore malformed config
+            }
+
+            return null;
         }
 
         /// <summary>

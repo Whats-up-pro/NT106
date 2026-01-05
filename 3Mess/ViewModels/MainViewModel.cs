@@ -23,6 +23,212 @@ public sealed class MainViewModel : ObservableObject
 {
     private static void Forget(Task task) { }
 
+    private MemberItemViewModel CreateMemberItemViewModel(
+        string userId,
+        string displayName,
+        string avatarText,
+        ImageSource? avatarImage,
+        string roleLabel,
+        bool canKick)
+    {
+        var vm = new MemberItemViewModel
+        {
+            UserId = userId,
+            Name = displayName,
+            RoleLabel = roleLabel,
+            AvatarImage = avatarImage,
+            CanKick = canKick,
+            AvatarText = string.IsNullOrWhiteSpace(avatarText) ? "?" : avatarText
+        };
+
+        vm.ViewProfileCommand = new RelayCommand(() =>
+        {
+            Forget(OpenOtherUserProfileAsync(vm.UserId, incomingRequestIdHint: null));
+        });
+
+        vm.MessageCommand = new RelayCommand(() =>
+        {
+            Forget(OpenChatWithUserIdAsync(vm.UserId));
+        });
+
+        vm.KickCommand = new RelayCommand(() =>
+        {
+            Forget(KickMemberFromCurrentGroupAsync(vm));
+        }, () => vm.CanKick);
+
+        // Lazy enrich member (non-friend) with best-effort name/avatar.
+        if (string.IsNullOrWhiteSpace(vm.Name) || string.Equals(vm.Name, vm.UserId, StringComparison.Ordinal))
+        {
+            Forget(EnrichMemberNameAsync(vm));
+        }
+        if (vm.AvatarImage == null)
+        {
+            Forget(EnrichMemberAvatarAsync(vm));
+        }
+
+        return vm;
+    }
+
+    private async Task EnrichMemberNameAsync(MemberItemViewModel vm)
+    {
+        try
+        {
+            if (vm == null || string.IsNullOrWhiteSpace(vm.UserId)) return;
+            var name = await ResolveUserDisplayNameAsync(vm.UserId);
+            if (string.IsNullOrWhiteSpace(name)) return;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                // Avoid overwriting if the UI already has a better name.
+                if (string.IsNullOrWhiteSpace(vm.Name) || string.Equals(vm.Name, vm.UserId, StringComparison.Ordinal))
+                {
+                    vm.Name = name;
+                }
+            });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task EnrichMemberAvatarAsync(MemberItemViewModel vm)
+    {
+        try
+        {
+            if (vm == null || string.IsNullOrWhiteSpace(vm.UserId)) return;
+            var img = await ResolveUserAvatarImageAsync(vm.UserId);
+            if (img == null) return;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (vm.AvatarImage == null)
+                {
+                    vm.AvatarImage = img;
+                }
+            });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task OpenChatWithUserIdAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return;
+
+        // This navigation does not originate from the sidebar selection.
+        // Prevent ApplySidebarFilter refreshes from auto-opening the selected sidebar item (often the current group).
+        _lockConversationAgainstSidebarAutoOpen = true;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (string.Equals(userId, currentUserId, StringComparison.Ordinal))
+        {
+            ShowToast("Bạn không thể nhắn tin với chính mình.", "info");
+            return;
+        }
+
+        // If they are already in friend list, reuse existing navigation (keeps sidebar in sync).
+        var friend = _allFriends.FirstOrDefault(f => string.Equals(f.UserId, userId, StringComparison.Ordinal));
+        if (friend != null)
+        {
+            GoHome();
+            SelectedSidebarItem = friend;
+            return;
+        }
+
+        GoHome();
+
+        // Open immediately using canonical id.
+        var conversationId = GetCanonicalPairId(currentUserId, userId);
+        var displayName = await ResolveUserDisplayNameAsync(userId);
+        var avatar = await ResolveUserAvatarImageAsync(userId);
+        var avatarText = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Substring(0, 1).ToUpperInvariant();
+
+        SelectedConversation = new ConversationItemViewModel
+        {
+            ConversationId = conversationId,
+            OtherUserId = userId,
+            Title = displayName,
+            Subtitle = string.Empty,
+            AvatarText = avatarText,
+            AvatarImage = avatar,
+            IsGroup = false
+        };
+
+        // Ensure conversation exists.
+        Forget(_messagingService.GetOrCreateConversation(currentUserId, userId));
+    }
+
+    private async Task KickMemberFromCurrentGroupAsync(MemberItemViewModel member)
+    {
+        if (member == null || string.IsNullOrWhiteSpace(member.UserId)) return;
+
+        var conv = SelectedConversation;
+        if (conv == null || !conv.IsGroup || string.IsNullOrWhiteSpace(conv.ConversationId))
+        {
+            ShowToast("Không phải group chat.", "error");
+            return;
+        }
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (!member.CanKick)
+        {
+            ShowToast("Bạn không có quyền kick thành viên.", "error");
+            return;
+        }
+
+        var result = MessageBox.Show(
+            $"Kick {member.Name} khỏi nhóm?",
+            "3Mess",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            await _messagingService.RemoveMemberFromGroupAsync(conv.ConversationId, currentUserId, member.UserId);
+
+            // Update local participant lists.
+            var updated = conv.ParticipantIds
+                .Where(x => !string.Equals(x, member.UserId, StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            conv.ParticipantIds = updated;
+
+            var group = _allGroups.FirstOrDefault(g => string.Equals(g.ConversationId, conv.ConversationId, StringComparison.Ordinal));
+            if (group != null)
+            {
+                group.ParticipantIds = updated;
+            }
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Members.Remove(member);
+            });
+
+            ShowToast("Đã kick thành viên khỏi nhóm.", "success");
+        }
+        catch (Exception ex)
+        {
+            // Service already throws friendly Vietnamese strings in most cases.
+            var msg = string.IsNullOrWhiteSpace(ex.Message) ? "Không thể kick thành viên." : ex.Message;
+            ShowToast(msg, "error");
+        }
+    }
+
     private static bool ComputeIsOnlineFromUserDoc(Dictionary<string, object> data)
     {
         bool onlineFlag;
@@ -122,6 +328,7 @@ public sealed class MainViewModel : ObservableObject
     private string? _lastSelectedGroupConversationId;
 
     private bool _suppressSidebarSelectionHandling;
+    private bool _lockConversationAgainstSidebarAutoOpen;
 
     private bool _isDarkMode;
     private bool _isActivityStatusEnabled = true;
@@ -220,6 +427,9 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _selectedSidebarItem, value)) return;
 
             if (_suppressSidebarSelectionHandling) return;
+
+            // If the user clicks in the sidebar, allow auto-open again.
+            _lockConversationAgainstSidebarAutoOpen = false;
 
             if (value is FriendItemViewModel f)
             {
@@ -2603,7 +2813,11 @@ public sealed class MainViewModel : ObservableObject
         }
 
         // If filtering changed the selection and there's no matching open conversation, open it once.
-        if (SelectedSidebarItem != null && !SidebarItemMatchesSelectedConversation(SelectedSidebarItem, previousConversation))
+        // BUT: when a chat was opened outside the sidebar (e.g. from group member actions),
+        // don't auto-switch back due to sidebar refreshes.
+        if (!_lockConversationAgainstSidebarAutoOpen
+            && SelectedSidebarItem != null
+            && !SidebarItemMatchesSelectedConversation(SelectedSidebarItem, previousConversation))
         {
             if (SelectedSidebarItem is FriendItemViewModel f)
             {
@@ -2682,6 +2896,7 @@ public sealed class MainViewModel : ObservableObject
                     string id = d.TryGetValue("conversationId", out var cid) ? cid?.ToString() ?? string.Empty : string.Empty;
                     string name = d.TryGetValue("groupName", out var gn) ? gn?.ToString() ?? "Nhóm chat" : "Nhóm chat";
                     string avatarDataUrl = d.TryGetValue("groupAvatarDataUrl", out var au) ? au?.ToString() ?? string.Empty : string.Empty;
+                    string createdBy = d.TryGetValue("createdBy", out var cb) ? cb?.ToString() ?? string.Empty : string.Empty;
 
                     bool pinned = d.TryGetValue("userPinned", out var p) && p is bool pb && pb;
                     bool muted = d.TryGetValue("userMuted", out var m) && m is bool mb && mb;
@@ -2707,6 +2922,7 @@ public sealed class MainViewModel : ObservableObject
                     {
                         ConversationId = id,
                         Name = name,
+                        CreatedByUserId = createdBy,
                         AvatarText = string.IsNullOrWhiteSpace(name) ? "G" : name.Substring(0, 1).ToUpperInvariant(),
                         AvatarImage = TryDecodeDataUrlToImageSource(string.IsNullOrWhiteSpace(avatarDataUrl) ? null : avatarDataUrl),
                         ParticipantIds = participants,
@@ -3056,7 +3272,8 @@ public sealed class MainViewModel : ObservableObject
             AvatarText = group.AvatarText,
             AvatarImage = group.AvatarImage,
             IsGroup = true,
-            ParticipantIds = group.ParticipantIds
+            ParticipantIds = group.ParticipantIds,
+            CreatedByUserId = group.CreatedByUserId
         };
 
         if (needsSidebarRefresh)
@@ -3143,20 +3360,40 @@ public sealed class MainViewModel : ObservableObject
 
             if (conversation.IsGroup && conversation.ParticipantIds.Count > 0)
             {
+                bool isAdmin = !string.IsNullOrWhiteSpace(conversation.CreatedByUserId)
+                               && string.Equals(conversation.CreatedByUserId, currentUserId, StringComparison.Ordinal);
+
                 foreach (var uid in conversation.ParticipantIds.Distinct(StringComparer.Ordinal))
                 {
                     if (string.IsNullOrWhiteSpace(uid)) continue;
 
                     if (string.Equals(uid, currentUserId, StringComparison.Ordinal))
                     {
-                        Members.Add(new MemberItemViewModel { Name = "Bạn", AvatarText = "B" });
+                        Members.Add(CreateMemberItemViewModel(
+                            userId: uid,
+                            displayName: "Bạn",
+                            avatarText: "B",
+                            avatarImage: CurrentUserAvatarImage,
+                            roleLabel: string.Equals(uid, conversation.CreatedByUserId, StringComparison.Ordinal) ? "Nhóm trưởng" : string.Empty,
+                            canKick: false));
                         continue;
                     }
 
                     var friend = _allFriends.FirstOrDefault(f => string.Equals(f.UserId, uid, StringComparison.Ordinal));
                     string name = friend?.Name ?? uid;
                     string avatarText = friend?.AvatarText ?? (string.IsNullOrWhiteSpace(name) ? "?" : name.Substring(0, 1).ToUpperInvariant());
-                    Members.Add(new MemberItemViewModel { Name = name, AvatarText = avatarText });
+
+                    bool canKick = isAdmin
+                                   && !string.Equals(uid, currentUserId, StringComparison.Ordinal)
+                                   && !string.Equals(uid, conversation.CreatedByUserId, StringComparison.Ordinal);
+
+                    Members.Add(CreateMemberItemViewModel(
+                        userId: uid,
+                        displayName: name,
+                        avatarText: avatarText,
+                        avatarImage: friend?.AvatarImage,
+                        roleLabel: string.Equals(uid, conversation.CreatedByUserId, StringComparison.Ordinal) ? "Nhóm trưởng" : string.Empty,
+                        canKick: canKick));
                 }
             }
             else

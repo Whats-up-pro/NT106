@@ -292,6 +292,70 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
+        /// Remove a member from a group conversation (kick).
+        /// Only the group creator (createdBy) can perform this action.
+        /// </summary>
+        public async Task RemoveMemberFromGroupAsync(string conversationId, string requesterUserId, string memberUserId)
+        {
+            if (string.IsNullOrWhiteSpace(conversationId))
+                throw new ArgumentException("conversationId must not be empty.");
+            if (string.IsNullOrWhiteSpace(requesterUserId))
+                throw new ArgumentException("requesterUserId must not be empty.");
+            if (string.IsNullOrWhiteSpace(memberUserId))
+                throw new ArgumentException("memberUserId must not be empty.");
+
+            var convRef = _db.Collection("conversations").Document(conversationId);
+
+            await _db.RunTransactionAsync(async tx =>
+            {
+                var snap = await tx.GetSnapshotAsync(convRef);
+                if (!snap.Exists)
+                    throw new InvalidOperationException("Conversation không tồn tại.");
+
+                var data = snap.ToDictionary();
+                bool isGroup = data.TryGetValue("isGroup", out var isg) && isg is bool b && b;
+                if (!isGroup)
+                    throw new InvalidOperationException("Không phải group chat.");
+
+                string createdBy = data.TryGetValue("createdBy", out var cb) ? cb?.ToString() ?? string.Empty : string.Empty;
+                if (string.IsNullOrWhiteSpace(createdBy) || !string.Equals(createdBy, requesterUserId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Bạn không có quyền kick thành viên trong nhóm này.");
+
+                if (string.Equals(memberUserId, requesterUserId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Không thể kick chính bạn.");
+
+                if (string.Equals(memberUserId, createdBy, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Không thể kick nhóm trưởng.");
+
+                List<string> participants;
+                try
+                {
+                    participants = snap.GetValue<List<string>>("participants") ?? new List<string>();
+                }
+                catch
+                {
+                    // Fallback if stored as object list
+                    participants = new List<string>();
+                    if (data.TryGetValue("participants", out var pObj) && pObj is IEnumerable<object> objs)
+                    {
+                        participants = objs.Select(x => x?.ToString() ?? string.Empty)
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .ToList();
+                    }
+                }
+
+                if (!participants.Contains(memberUserId, StringComparer.Ordinal))
+                {
+                    // Already removed (idempotent)
+                    return;
+                }
+
+                var updated = participants.Where(x => !string.Equals(x, memberUserId, StringComparison.Ordinal)).ToList();
+                tx.Update(convRef, new Dictionary<string, object> { { "participants", updated } });
+            });
+        }
+
+        /// <summary>
         /// Send a message
         /// </summary>
         public async Task<(bool success, string message)> SendMessage(string conversationId, string senderId, string content)

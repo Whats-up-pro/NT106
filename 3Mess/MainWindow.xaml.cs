@@ -129,6 +129,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void MemberMore_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        if (fe.ContextMenu == null) return;
+
+        fe.ContextMenu.PlacementTarget = fe;
+        fe.ContextMenu.IsOpen = true;
+        e.Handled = true;
+    }
+
 
     private static double Clamp(double v, double min, double max)
     {

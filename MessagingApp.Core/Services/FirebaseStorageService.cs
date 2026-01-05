@@ -29,7 +29,7 @@ public sealed class FirebaseStorageService
             throw new FileNotFoundException($"Firebase credentials file not found: {credentialsPath}");
         }
 
-        _projectId = TryReadProjectIdFromServiceAccountJson(credentialsPath) ?? FirebaseConfig.ProjectId;
+        _projectId = FirebaseConfig.ResolvedProjectId;
         var credential = GoogleCredential.FromFile(credentialsPath);
         _client = StorageClient.Create(credential);
     }

@@ -1,263 +1,107 @@
-# 🔥 Hướng Dẫn Cấu Hình Firebase
+# 🔥 Hướng Dẫn Cấu Hình Firebase (3Mess)
 
-Tài liệu này hướng dẫn chi tiết cách thiết lập Firebase cho ứng dụng Messaging App.
+Tài liệu này hướng dẫn thiết lập Firebase cho **3Mess (WPF + Firebase/Firestore/Storage)**.
 
----
-
-## 📋 Mục Lục
-1. [Tạo Firebase Project](#1-tạo-firebase-project)
-2. [Enable Firebase Authentication](#2-enable-firebase-authentication)
-3. [Thiết lập Cloud Firestore](#3-thiết-lập-cloud-firestore)
-4. [Tạo Service Account Key](#4-tạo-service-account-key)
-5. [Cấu hình Ứng dụng](#5-cấu-hình-ứng-dụng)
-6. [Firestore Security Rules](#6-firestore-security-rules)
-7. [Kiểm tra Kết nối](#7-kiểm-tra-kết-nối)
+> Lưu ý quan trọng: bản demo/đồ án hiện tại dùng **Firebase Admin SDK (service account JSON) ngay trên máy client** để thao tác Firestore/Storage.
+> Đây là cách làm phù hợp cho đồ án/demo nội bộ, nhưng **không khuyến nghị** cho production.
 
 ---
 
-## 1. Tạo Firebase Project
-
-### Bước 1.1: Truy cập Firebase Console
-1. Mở trình duyệt và truy cập: https://console.firebase.google.com
-2. Đăng nhập bằng tài khoản Google của bạn
-
-### Bước 1.2: Tạo Project Mới
-1. Click **"Add project"** hoặc **"Create a project"**
-2. Nhập tên project (ví dụ: `MessagingApp` hoặc `nt106-messaging`)
-3. (Tùy chọn) Tắt Google Analytics nếu không cần thiết
-4. Click **"Create project"**
-5. Đợi Firebase tạo project (khoảng 30 giây)
-6. Click **"Continue"** khi hoàn tất
-
-### Bước 1.3: Lưu Project ID
-- Sau khi tạo xong, vào **Project Settings** (icon bánh răng ⚙️ bên cạnh "Project Overview")
-- Phần **"General"**, copy **Project ID** (ví dụ: `messaging-app-123abc`)
-- **LƯU LẠI** Project ID này, sẽ cần dùng sau
+## 1) Tạo Firebase Project
+1. Vào https://console.firebase.google.com → **Add project**
+2. Lưu lại **Project ID** (Project settings → General → Project ID)
 
 ---
 
-## 2. Enable Firebase Authentication
+## 2) Bật Firebase Authentication (Email/Password)
+1. Authentication → Sign-in method
+2. Enable **Email/Password** → Save
 
-### Bước 2.1: Vào Authentication
-1. Trong Firebase Console, click **"Authentication"** ở menu bên trái
-2. Click **"Get started"** nếu lần đầu sử dụng
-
-### Bước 2.2: Enable Email/Password Provider
-1. Click tab **"Sign-in method"**
-2. Tìm **"Email/Password"** trong danh sách providers
-3. Click vào **"Email/Password"**
-4. Toggle **"Enable"** sang ON
-5. (Tùy chọn) Có thể bật **"Email link (passwordless sign-in)"** nếu muốn
-6. Click **"Save"**
-
-### Bước 2.3: (Tùy chọn) Tạo Test Users
-1. Click tab **"Users"**
-2. Click **"Add user"**
-3. Nhập:
-   - Email: `test@example.com`
-   - Password: `Test123456`
-4. Click **"Add user"**
+### (Khuyến nghị) Tùy chỉnh email reset mật khẩu
+Authentication → Templates → **Password reset**
 
 ---
 
-## 3. Thiết lập Cloud Firestore
+## 3) Bật Cloud Firestore
+1. Firestore Database → Create database
+2. Chọn location (gợi ý: `asia-southeast1`)
 
-### Bước 3.1: Vào Firestore Database
-1. Click **"Firestore Database"** ở menu bên trái
-2. Click **"Create database"**
-
-### Bước 3.2: Chọn Mode
-1. Chọn **"Start in production mode"** (khuyến nghị)
-   - Security rules sẽ được cấu hình sau
-2. Click **"Next"**
-
-### Bước 3.3: Chọn Location
-1. Chọn location gần bạn nhất:
-   - **asia-southeast1 (Singapore)** - Tốt nhất cho Việt Nam
-   - **asia-east1 (Taiwan)**
-   - **asia-northeast1 (Tokyo)**
-2. Click **"Enable"**
-3. Đợi Firestore khởi tạo (khoảng 30-60 giây)
-
-### Bước 3.4: Tạo Collections (Tùy chọn - App sẽ tự tạo)
-Ứng dụng sẽ tự động tạo các collections, nhưng nếu muốn tạo trước:
-
-#### Collection: `users`
-1. Click **"Start collection"**
-2. Collection ID: `users`
-3. Thêm document mẫu:
-   - Document ID: (auto-generated)
-   - Fields:
-     ```
-     userId: string = "sample_id"
-     username: string = "testuser"
-     email: string = "test@example.com"
-     fullName: string = "Test User"
-     status: string = "offline"
-     createdAt: timestamp = (current time)
-     ```
-4. Click **"Save"**
-
-Các collections khác sẽ tự động được tạo khi sử dụng app:
+Các collection chính app sẽ tự tạo khi chạy:
+- `users`
+- `friendRequests`
 - `friendships`
 - `conversations`
-- `callHistory`
+- `messages`
 
 ---
 
-## 4. Tạo Service Account Key
+## 4) Bật Firebase Storage (nếu dùng gửi file)
+1. Build → Storage → Get started
+2. Tạo bucket mặc định
 
-⚠️ **QUAN TRỌNG**: Service Account Key chứa thông tin nhạy cảm. **KHÔNG BAO GIỜ** commit vào Git!
-
-### Bước 4.1: Vào Project Settings
-1. Click icon **⚙️ (Settings)** > **"Project settings"**
-2. Chọn tab **"Service accounts"**
-
-### Bước 4.2: Generate Private Key
-1. Trong phần **"Firebase Admin SDK"**, chọn **C#** (hoặc bất kỳ)
-2. Click nút **"Generate new private key"**
-3. Một popup xuất hiện cảnh báo bảo mật
-4. Click **"Generate key"**
-5. File JSON sẽ được download tự động (tên dạng: `messaging-app-123abc-firebase-adminsdk-xxxxx-xxxxxxxxxx.json`)
-
-### Bước 4.3: Lưu File JSON
-1. **Đổi tên file** thành: `firebase-credentials.json`
-2. **Di chuyển file** vào thư mục:
-   ```
-   MessagingApp/Config/firebase-credentials.json
-   ```
-3. **Kiểm tra .gitignore** đã có dòng:
-   ```gitignore
-   **/firebase-credentials.json
-   **/Config/firebase-credentials.json
-   firebase-adminsdk-*.json
-   ```
+Bucket mặc định thường là: `{projectId}.appspot.com`.
+Nếu bucket của bạn khác, có thể set env var `FIREBASE_STORAGE_BUCKET`.
 
 ---
 
-## 5. Cấu hình Ứng dụng
+## 5) Tạo Service Account Key (Admin SDK)
+⚠️ **KHÔNG BAO GIỜ commit file JSON này lên Git**.
 
-### Bước 5.1: Cập nhật Project ID
-Mở file `MessagingApp/Config/FirebaseConfig.cs`:
+1. Project settings → Service accounts
+2. Generate new private key → tải file JSON
+3. Đổi tên thành `firebase-credentials.json`
 
-```csharp
-public const string ProjectId = "your-firebase-project-id"; // TODO: Replace
+### Cách cấu hình cho app
+Bạn có 2 cách:
+
+**Cách A (khuyến nghị): biến môi trường `FIREBASE_CREDENTIALS`**
+
+PowerShell:
+```powershell
+$env:FIREBASE_CREDENTIALS="C:\path\to\firebase-credentials.json"
 ```
 
-Thay `"your-firebase-project-id"` bằng **Project ID** đã lưu ở Bước 1.3, ví dụ:
+**Cách B: đặt file trong repo (đã gitignore)**
+- `3Mess/Config/firebase-credentials.json` hoặc `MessagingApp.Core/Config/firebase-credentials.json`
 
-```csharp
-public const string ProjectId = "messaging-app-123abc";
+> App sẽ auto-detect `projectId` từ service account JSON (field `project_id`) nên thường **không cần sửa code**.
+
+---
+
+## 6) Cấu hình Firebase Web API Key (bắt buộc cho Login/Forgot Password)
+3Mess đăng nhập email/password qua Firebase Auth REST API (`signInWithPassword`) và gửi email reset (`sendOobCode`), nên cần **Web API Key**.
+
+Lấy key:
+1. Project settings → General
+2. Trong phần “Your apps”, tạo **Web App** (chỉ để lấy key)
+3. Copy **Web API Key**
+
+Điền vào file: `3Mess/Config/firebase-client-config.json`
+```json
+{
+  "webApiKey": "YOUR_FIREBASE_WEB_API_KEY",
+  "projectId": "your-project-id"
+}
 ```
 
-### Bước 5.2: Verify File Structure
-Đảm bảo cấu trúc thư mục đúng:
+`projectId` là tùy chọn.
 
-```
-MessagingApp/
-├── Config/
-│   ├── FirebaseConfig.cs
-│   └── firebase-credentials.json  ← File này phải tồn tại
-├── Services/
-│   ├── FirebaseAuthService.cs
-│   └── ThemeService.cs
-└── ...
-```
+---
 
-### Bước 5.3: Restore NuGet Packages
-Mở terminal trong thư mục dự án và chạy:
-
-```bash
-cd MessagingApp
+## 7) Chạy app
+Tại root repo:
+```powershell
 dotnet restore
+dotnet build .\NT106.sln
+dotnet run --project .\3Mess\3Mess.csproj
 ```
-
-Kiểm tra các packages đã được cài đặt:
-- ✅ FirebaseAdmin (v3.0.0)
-- ✅ Google.Cloud.Firestore (v3.7.0)
-- ✅ Google.Apis.Auth (v1.68.0)
-- ✅ Newtonsoft.Json (v13.0.3)
 
 ---
 
-## 6. Firestore Security Rules
-
-### Bước 6.1: Vào Rules Tab
-1. Trong **Firestore Database**, click tab **"Rules"**
-2. Xóa nội dung hiện tại
-
-### Bước 6.2: Paste Security Rules
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // Helper function: Check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Helper function: Check if user owns the document
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    // Users collection
-    match /users/{userId} {
-      // Anyone authenticated can read user profiles
-      allow read: if isAuthenticated();
-      
-      // Users can only write their own profile
-      allow create: if isOwner(userId);
-      allow update, delete: if isOwner(userId);
-    }
-    
-    // Friendships collection
-    match /friendships/{friendshipId} {
-      // Users can read friendships they're part of
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId1 ||
-        request.auth.uid == resource.data.userId2
-      );
-      
-      // Users can create friendship requests
-      allow create: if isAuthenticated();
-      
-      // Users can update/delete their own friendships
-      allow update, delete: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId1 ||
-        request.auth.uid == resource.data.userId2
-      );
-    }
-    
-    // Conversations collection
-    match /conversations/{conversationId} {
-      // Participants can read the conversation
-      allow read: if isAuthenticated() && 
-        request.auth.uid in resource.data.participants;
-      
-      // Authenticated users can create conversations
-      allow create: if isAuthenticated();
-      
-      // Participants can update the conversation
-      allow update: if isAuthenticated() && 
-        request.auth.uid in resource.data.participants;
-      
-      // Participants can delete (leave) the conversation
-      allow delete: if isAuthenticated() && 
-        request.auth.uid in resource.data.participants;
-      
-      // Messages subcollection
-      match /messages/{messageId} {
-        // Participants can read messages
-        allow read: if isAuthenticated() && 
-          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-        
-        // Authenticated users can create messages
-        allow create: if isAuthenticated();
-        
-        // Senders can update/delete their messages
+## 8) Troubleshooting nhanh
+- **Lỗi không tìm thấy credentials**: kiểm tra `FIREBASE_CREDENTIALS` hoặc đặt đúng `firebase-credentials.json` vào `3Mess/Config/`.
+- **Đăng nhập/Quên mật khẩu báo thiếu API key**: điền `webApiKey` trong `3Mess/Config/firebase-client-config.json`.
+- **Upload Storage bị NotFound bucket**: bật Storage trong Firebase Console hoặc set `FIREBASE_STORAGE_BUCKET` đúng.
         allow update, delete: if isAuthenticated() && 
           request.auth.uid == resource.data.senderId;
       }

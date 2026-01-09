@@ -1693,19 +1693,138 @@
                         </Button>
                     </UniformGrid>
 
-                    <!-- Second icons row (4 buttons) -->
-                    <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,14">
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
+                    <!-- Second icons row (3 buttons) -->
+                    <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,14">
+                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Gọi thoại"
+                                Command="{Binding StartVoiceCallCommand}">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE717;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE714;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        </Button>
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Kết bạn" Click="RightSidebarFriends_Click">
+                        
+                        <!-- Bell icon with notification badge and popup -->
+                        <Grid Margin="0,0,8,0">
+                            <ToggleButton x:Name="NotificationToggle" Style="{StaticResource RightSidebarIconToggleButton}" ToolTip="Thông báo"
+                                          IsChecked="{Binding IsNotificationPopupOpen, Mode=TwoWay}">
+                                <Grid>
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7ED;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    
+                                    <!-- Notification badge -->
+                                    <Border Width="18" Height="18" CornerRadius="9" Background="#FFEF4444"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0"
+                                            Visibility="{Binding HasPendingFriendRequests, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding PendingFriendRequestsCount}" Foreground="White" FontSize="10" FontWeight="Bold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Grid>
+                            </ToggleButton>
+
+                            <!-- Notification Popup -->
+                            <Popup Placement="Bottom" PlacementTarget="{Binding ElementName=NotificationToggle}"
+                                   IsOpen="{Binding IsNotificationPopupOpen, Mode=TwoWay}"
+                                   StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                        CornerRadius="12" Padding="12" Width="280" MaxHeight="400">
+                                    <StackPanel>
+                                        <TextBlock Text="Lời mời kết bạn" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+
+                                        <!-- Friend requests list -->
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="350">
+                                            <ScrollViewer.Style>
+                                                <Style TargetType="ScrollViewer">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasPendingFriendRequests}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ScrollViewer.Style>
+                                            <ItemsControl ItemsSource="{Binding PendingFriendRequests}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,8">
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto" />
+                                                                    <RowDefinition Height="Auto" />
+                                                                </Grid.RowDefinitions>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="40" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <!-- Avatar -->
+                                                                <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Top" Grid.RowSpan="2">
+                                                                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" />
+                                                                </Border>
+
+                                                                <!-- Name and subtitle -->
+                                                                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" FontSize="13" />
+                                                                    <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+
+                                                                <!-- Action buttons -->
+                                                                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="10,8,0,0">
+                                                                    <Button Height="28" MinWidth="70" Margin="0,0,6,0"
+                                                                            Background="{DynamicResource PrimaryBrush}" BorderThickness="0" Cursor="Hand"
+                                                                            Command="{Binding DataContext.AcceptFriendRequestFromNotificationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}">
+                                                                        <Button.Template>
+                                                                            <ControlTemplate TargetType="Button">
+                                                                                <Border Background="{TemplateBinding Background}" CornerRadius="12" Padding="10,0">
+                                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                                </Border>
+                                                                            </ControlTemplate>
+                                                                        </Button.Template>
+                                                                        <TextBlock Text="Chấp nhận" Foreground="White" FontWeight="SemiBold" FontSize="11" />
+                                                                    </Button>
+
+                                                                    <Button Height="28" MinWidth="60"
+                                                                            Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"
+                                                                            Command="{Binding DataContext.DeclineFriendRequestFromNotificationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}">
+                                                                        <Button.Template>
+                                                                            <ControlTemplate TargetType="Button">
+                                                                                <Border Background="{TemplateBinding Background}"
+                                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                                        CornerRadius="12" Padding="10,0">
+                                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                                </Border>
+                                                                            </ControlTemplate>
+                                                                        </Button.Template>
+                                                                        <TextBlock Text="Từ chối" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" />
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+
+                                        <!-- Empty state -->
+                                        <TextBlock Text="Không có lời mời mới" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,20,0,20"
+                                                   HorizontalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasPendingFriendRequests}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        
+                        <Button Style="{StaticResource RightSidebarIconButton}" ToolTip="Kết bạn" Click="RightSidebarFriends_Click">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE716;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        </Button>
-                        <Button Style="{StaticResource RightSidebarIconButton}">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE840;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
                     </UniformGrid>
 

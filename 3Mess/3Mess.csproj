@@ -8,7 +8,15 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>3Mess</AssemblyName>
     <RootNamespace>ThreeMess</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Copy Agora DLLs to output directory -->
+    <None Include="libs\*.dll" Condition="Exists('libs')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MessagingApp.Core\MessagingApp.Core.csproj" />

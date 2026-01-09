@@ -57,8 +57,10 @@ public sealed class MainViewModel : ObservableObject
     private readonly FirestoreFriendsService _friendsService;
     private readonly FirestoreMessagingService _messagingService;
     private readonly FirebaseStorageService _storageService;
+    private readonly FirestoreCallingService _callingService;
     private FirestoreChangeListener? _messageListener;
     private FirestoreChangeListener? _typingListener;
+    private FirestoreChangeListener? _incomingCallsListener;
     private readonly Dictionary<string, FirestoreChangeListener> _friendStatusListeners = new();
 
     private object? _selectedSidebarItem;
@@ -136,10 +138,15 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<RightSidebarLinkItemViewModel> RightLinks { get; } = new();
 
     public ObservableCollection<UserSearchResultViewModel> FriendFinderResults { get; } = new();
+    public ObservableCollection<FriendRequestItemViewModel> PendingFriendRequests { get; } = new();
 
     private readonly List<FriendItemViewModel> _allFriends = new();
     private readonly List<GroupChatItemViewModel> _allGroups = new();
     private readonly HashSet<string> _locallyHiddenMessageIds = new(StringComparer.Ordinal);
+    
+    private FirestoreChangeListener? _friendRequestsListener;
+    private int _pendingFriendRequestsCount;
+    private bool _isNotificationPopupOpen;
 
     private readonly Dictionary<string, List<MessageItemViewModel>> _messageCache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTime> _pendingOutgoingByTempId = new(StringComparer.Ordinal);
@@ -225,6 +232,7 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _selectedConversation, value)) return;
             IncomingAvatarText = string.IsNullOrWhiteSpace(value?.AvatarText) ? "A" : value!.AvatarText;
             ((RelayCommand)SendMessageCommand).RaiseCanExecuteChanged();
+            ((RelayCommand)StartVoiceCallCommand).RaiseCanExecuteChanged();
             _ = SwitchConversationAsync(value);
         }
     }
@@ -292,6 +300,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand UpdateNotificationsCommand { get; }
 
     public ICommand LogoutCommand { get; }
+    public ICommand ToggleNotificationPopupCommand { get; }
+    public ICommand AcceptFriendRequestFromNotificationCommand { get; }
+    public ICommand DeclineFriendRequestFromNotificationCommand { get; }
+    public ICommand StartVoiceCallCommand { get; }
 
     public event Action? LogoutRequested;
 
@@ -301,6 +313,7 @@ public sealed class MainViewModel : ObservableObject
         _friendsService = FirestoreFriendsService.Instance;
         _messagingService = FirestoreMessagingService.Instance;
         _storageService = FirebaseStorageService.Instance;
+        _callingService = FirestoreCallingService.Instance;
 
         _typingIdleTimer = new DispatcherTimer
         {
@@ -381,8 +394,15 @@ public sealed class MainViewModel : ObservableObject
 
         LogoutCommand = new RelayCommand(() => Forget(LogoutAsync()));
 
+        ToggleNotificationPopupCommand = new RelayCommand(() => IsNotificationPopupOpen = !IsNotificationPopupOpen);
+        AcceptFriendRequestFromNotificationCommand = new RelayCommand<object>(o => Forget(AcceptFriendRequestFromNotificationAsync(o as FriendRequestItemViewModel)), o => o is FriendRequestItemViewModel);
+        DeclineFriendRequestFromNotificationCommand = new RelayCommand<object>(o => Forget(DeclineFriendRequestFromNotificationAsync(o as FriendRequestItemViewModel)), o => o is FriendRequestItemViewModel);
+        StartVoiceCallCommand = new RelayCommand(() => Forget(StartCallAsync()), () => SelectedConversation != null);
+
         _ = LoadFriendsAsync();
         _ = LoadGroupsAsync();
+        _ = StartFriendRequestsListenerAsync();
+        _ = StartIncomingCallsListenerAsync();
 
         // Best-effort: preload current user's avatar for the top-right button.
         Forget(RefreshCurrentUserAvatarAsync());
@@ -414,6 +434,20 @@ public sealed class MainViewModel : ObservableObject
             Forget(UpdatePresenceAsync(true));
         }
     }
+
+    public int PendingFriendRequestsCount
+    {
+        get => _pendingFriendRequestsCount;
+        private set => SetProperty(ref _pendingFriendRequestsCount, value);
+    }
+
+    public bool IsNotificationPopupOpen
+    {
+        get => _isNotificationPopupOpen;
+        set => SetProperty(ref _isNotificationPopupOpen, value);
+    }
+
+    public bool HasPendingFriendRequests => PendingFriendRequestsCount > 0;
 
     private void ApplyThemeFromSettings()
     {
@@ -3158,6 +3192,265 @@ public sealed class MainViewModel : ObservableObject
         }
 
         return _storageService.DownloadToFileAsync(resolvedBucket!, storageObject!, destinationPath);
+    }
+
+    private async Task StartFriendRequestsListenerAsync()
+    {
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        try
+        {
+            _friendRequestsListener = _friendsService.ListenToPendingRequests(currentUserId, async () =>
+            {
+                await LoadPendingFriendRequestsAsync();
+            });
+
+            // Initial load
+            await LoadPendingFriendRequestsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to start friend requests listener: {ex.Message}");
+        }
+    }
+
+    private async Task LoadPendingFriendRequestsAsync()
+    {
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        try
+        {
+            var requests = await _friendsService.GetPendingRequests(currentUserId);
+            
+            var mapped = requests.Select(d =>
+            {
+                string requestId = d.TryGetValue("requestId", out var rid) ? rid?.ToString() ?? string.Empty : string.Empty;
+                string fromUserId = d.TryGetValue("fromUserId", out var fid) ? fid?.ToString() ?? string.Empty : string.Empty;
+                string senderUsername = d.TryGetValue("senderUsername", out var su) ? su?.ToString() ?? string.Empty : string.Empty;
+                string senderFullName = d.TryGetValue("senderFullName", out var sfn) ? sfn?.ToString() ?? string.Empty : string.Empty;
+                string senderEmail = d.TryGetValue("senderEmail", out var se) ? se?.ToString() ?? string.Empty : string.Empty;
+
+                string displayName = string.IsNullOrWhiteSpace(senderFullName)
+                    ? (string.IsNullOrWhiteSpace(senderUsername) ? senderEmail : senderUsername)
+                    : senderFullName;
+
+                string subtitle = !string.IsNullOrWhiteSpace(senderUsername)
+                    ? $"@{senderUsername}"
+                    : senderEmail;
+
+                return new FriendRequestItemViewModel
+                {
+                    RequestId = requestId,
+                    FromUserId = fromUserId,
+                    DisplayName = displayName,
+                    Subtitle = subtitle,
+                    AvatarText = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Substring(0, 1).ToUpperInvariant()
+                };
+            }).ToList();
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                PendingFriendRequests.Clear();
+                foreach (var r in mapped)
+                {
+                    PendingFriendRequests.Add(r);
+                }
+                PendingFriendRequestsCount = PendingFriendRequests.Count;
+                OnPropertyChanged(nameof(HasPendingFriendRequests));
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load pending friend requests: {ex.Message}");
+        }
+    }
+
+    private async Task AcceptFriendRequestFromNotificationAsync(FriendRequestItemViewModel? request)
+    {
+        if (request == null) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        try
+        {
+            var (success, message) = await _friendsService.AcceptFriendRequest(request.RequestId, request.FromUserId, currentUserId);
+            ShowToast(message, success ? "success" : "error");
+            if (success)
+            {
+                // Reload friends list
+                await LoadFriendsAsync();
+                // Request will be removed automatically by the listener
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private async Task DeclineFriendRequestFromNotificationAsync(FriendRequestItemViewModel? request)
+    {
+        if (request == null) return;
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        try
+        {
+            var (success, message) = await _friendsService.DeclineFriendRequest(request.RequestId);
+            ShowToast(message, success ? "success" : "error");
+            // Request will be removed automatically by the listener
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private async Task StartIncomingCallsListenerAsync()
+    {
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+        try
+        {
+            _incomingCallsListener = _callingService.ListenToIncomingCalls(currentUserId, callData =>
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    HandleIncomingCall(callData);
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to start incoming calls listener: {ex.Message}");
+        }
+    }
+
+    private void HandleIncomingCall(Dictionary<string, object> callData)
+    {
+        try
+        {
+            string callId = callData.TryGetValue("callId", out var cid) ? cid?.ToString() ?? string.Empty : string.Empty;
+            string callerId = callData.TryGetValue("callerId", out var cidr) ? cidr?.ToString() ?? string.Empty : string.Empty;
+            bool isVideo = callData.TryGetValue("isVideo", out var iv) && iv is bool b && b;
+
+            var participants = new List<string>();
+            if (callData.TryGetValue("participants", out var pObj) && pObj is List<object> pList)
+            {
+                participants = pList.Select(p => p?.ToString() ?? string.Empty).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+            }
+
+            // Show incoming call notification
+            var result = MessageBox.Show(
+                $"Cuộc gọi {(isVideo ? "video" : "thoại")} đến" + (participants.Count > 1 ? " (nhóm)" : ""),
+                "Cuộc gọi đến",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                OpenCallWindow(callId, isVideo, true, callerId, participants);
+            }
+            else
+            {
+                // Reject call
+                string? currentUserId = _authService.CurrentUserId;
+                if (!string.IsNullOrWhiteSpace(currentUserId))
+                {
+                    Forget(_callingService.RejectCall(callId, currentUserId));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error handling incoming call: {ex.Message}");
+        }
+    }
+
+    private async Task StartCallAsync()
+    {
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (SelectedConversation == null)
+        {
+            ShowToast("Vui lòng chọn cuộc trò chuyện.", "error");
+            return;
+        }
+
+        try
+        {
+            List<string> participantIds;
+
+            if (SelectedConversation.IsGroup)
+            {
+                // Group call
+                participantIds = SelectedConversation.ParticipantIds
+                    .Where(p => !string.IsNullOrWhiteSpace(p) && p != currentUserId)
+                    .ToList();
+            }
+            else
+            {
+                // 1-1 call
+                if (string.IsNullOrWhiteSpace(SelectedConversation.OtherUserId))
+                {
+                    ShowToast("Không thể xác định người nhận cuộc gọi.", "error");
+                    return;
+                }
+                participantIds = new List<string> { SelectedConversation.OtherUserId };
+            }
+
+            if (participantIds.Count == 0)
+            {
+                ShowToast("Không có người tham gia cuộc gọi.", "error");
+                return;
+            }
+
+            var (success, message, callId) = await _callingService.InitiateCall(currentUserId, participantIds, false);
+
+            if (!success || string.IsNullOrWhiteSpace(callId))
+            {
+                ShowToast(message, "error");
+                return;
+            }
+
+            // Open call window
+            OpenCallWindow(callId, false, false, currentUserId, participantIds);
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi khi bắt đầu cuộc gọi: {ex.Message}", "error");
+        }
+    }
+
+    private void OpenCallWindow(string callId, bool isVideo, bool isIncoming, string callerId, List<string> participantIds)
+    {
+        try
+        {
+            var callViewModel = new CallViewModel(callId, isVideo, isIncoming, callerId, participantIds);
+            var callWindow = new CallWindow(callViewModel);
+            callWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error opening call window: {ex.Message}");
+            ShowToast("Không thể mở cửa sổ cuộc gọi.", "error");
+        }
     }
 
     private static byte[]? TryLoadAndCompressToJpeg(string filePath, int maxDimension, int quality)

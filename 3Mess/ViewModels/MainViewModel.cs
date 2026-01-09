@@ -23,6 +23,212 @@ public sealed class MainViewModel : ObservableObject
 {
     private static void Forget(Task task) { }
 
+    private MemberItemViewModel CreateMemberItemViewModel(
+        string userId,
+        string displayName,
+        string avatarText,
+        ImageSource? avatarImage,
+        string roleLabel,
+        bool canKick)
+    {
+        var vm = new MemberItemViewModel
+        {
+            UserId = userId,
+            Name = displayName,
+            RoleLabel = roleLabel,
+            AvatarImage = avatarImage,
+            CanKick = canKick,
+            AvatarText = string.IsNullOrWhiteSpace(avatarText) ? "?" : avatarText
+        };
+
+        vm.ViewProfileCommand = new RelayCommand(() =>
+        {
+            Forget(OpenOtherUserProfileAsync(vm.UserId, incomingRequestIdHint: null));
+        });
+
+        vm.MessageCommand = new RelayCommand(() =>
+        {
+            Forget(OpenChatWithUserIdAsync(vm.UserId));
+        });
+
+        vm.KickCommand = new RelayCommand(() =>
+        {
+            Forget(KickMemberFromCurrentGroupAsync(vm));
+        }, () => vm.CanKick);
+
+        // Lazy enrich member (non-friend) with best-effort name/avatar.
+        if (string.IsNullOrWhiteSpace(vm.Name) || string.Equals(vm.Name, vm.UserId, StringComparison.Ordinal))
+        {
+            Forget(EnrichMemberNameAsync(vm));
+        }
+        if (vm.AvatarImage == null)
+        {
+            Forget(EnrichMemberAvatarAsync(vm));
+        }
+
+        return vm;
+    }
+
+    private async Task EnrichMemberNameAsync(MemberItemViewModel vm)
+    {
+        try
+        {
+            if (vm == null || string.IsNullOrWhiteSpace(vm.UserId)) return;
+            var name = await ResolveUserDisplayNameAsync(vm.UserId);
+            if (string.IsNullOrWhiteSpace(name)) return;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                // Avoid overwriting if the UI already has a better name.
+                if (string.IsNullOrWhiteSpace(vm.Name) || string.Equals(vm.Name, vm.UserId, StringComparison.Ordinal))
+                {
+                    vm.Name = name;
+                }
+            });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task EnrichMemberAvatarAsync(MemberItemViewModel vm)
+    {
+        try
+        {
+            if (vm == null || string.IsNullOrWhiteSpace(vm.UserId)) return;
+            var img = await ResolveUserAvatarImageAsync(vm.UserId);
+            if (img == null) return;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (vm.AvatarImage == null)
+                {
+                    vm.AvatarImage = img;
+                }
+            });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task OpenChatWithUserIdAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return;
+
+        // This navigation does not originate from the sidebar selection.
+        // Prevent ApplySidebarFilter refreshes from auto-opening the selected sidebar item (often the current group).
+        _lockConversationAgainstSidebarAutoOpen = true;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (string.Equals(userId, currentUserId, StringComparison.Ordinal))
+        {
+            ShowToast("Bạn không thể nhắn tin với chính mình.", "info");
+            return;
+        }
+
+        // If they are already in friend list, reuse existing navigation (keeps sidebar in sync).
+        var friend = _allFriends.FirstOrDefault(f => string.Equals(f.UserId, userId, StringComparison.Ordinal));
+        if (friend != null)
+        {
+            GoHome();
+            SelectedSidebarItem = friend;
+            return;
+        }
+
+        GoHome();
+
+        // Open immediately using canonical id.
+        var conversationId = GetCanonicalPairId(currentUserId, userId);
+        var displayName = await ResolveUserDisplayNameAsync(userId);
+        var avatar = await ResolveUserAvatarImageAsync(userId);
+        var avatarText = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Substring(0, 1).ToUpperInvariant();
+
+        SelectedConversation = new ConversationItemViewModel
+        {
+            ConversationId = conversationId,
+            OtherUserId = userId,
+            Title = displayName,
+            Subtitle = string.Empty,
+            AvatarText = avatarText,
+            AvatarImage = avatar,
+            IsGroup = false
+        };
+
+        // Ensure conversation exists.
+        Forget(_messagingService.GetOrCreateConversation(currentUserId, userId));
+    }
+
+    private async Task KickMemberFromCurrentGroupAsync(MemberItemViewModel member)
+    {
+        if (member == null || string.IsNullOrWhiteSpace(member.UserId)) return;
+
+        var conv = SelectedConversation;
+        if (conv == null || !conv.IsGroup || string.IsNullOrWhiteSpace(conv.ConversationId))
+        {
+            ShowToast("Không phải group chat.", "error");
+            return;
+        }
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (!member.CanKick)
+        {
+            ShowToast("Bạn không có quyền kick thành viên.", "error");
+            return;
+        }
+
+        var result = MessageBox.Show(
+            $"Kick {member.Name} khỏi nhóm?",
+            "3Mess",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            await _messagingService.RemoveMemberFromGroupAsync(conv.ConversationId, currentUserId, member.UserId);
+
+            // Update local participant lists.
+            var updated = conv.ParticipantIds
+                .Where(x => !string.Equals(x, member.UserId, StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            conv.ParticipantIds = updated;
+
+            var group = _allGroups.FirstOrDefault(g => string.Equals(g.ConversationId, conv.ConversationId, StringComparison.Ordinal));
+            if (group != null)
+            {
+                group.ParticipantIds = updated;
+            }
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Members.Remove(member);
+            });
+
+            ShowToast("Đã kick thành viên khỏi nhóm.", "success");
+        }
+        catch (Exception ex)
+        {
+            // Service already throws friendly Vietnamese strings in most cases.
+            var msg = string.IsNullOrWhiteSpace(ex.Message) ? "Không thể kick thành viên." : ex.Message;
+            ShowToast(msg, "error");
+        }
+    }
+
     private static bool ComputeIsOnlineFromUserDoc(Dictionary<string, object> data)
     {
         bool onlineFlag;
@@ -124,9 +330,29 @@ public sealed class MainViewModel : ObservableObject
     private string? _lastSelectedGroupConversationId;
 
     private bool _suppressSidebarSelectionHandling;
+    private bool _lockConversationAgainstSidebarAutoOpen;
 
     private bool _isDarkMode;
     private bool _isActivityStatusEnabled = true;
+    private bool _areNotificationsEnabled = true;
+
+    private FirestoreChangeListener? _notificationsConversationListener;
+    private FirestoreChangeListener? _notificationsPendingRequestsListener;
+    private FirestoreChangeListener? _notificationsFriendshipsListener;
+
+    private bool _notificationsInitializedConversations;
+    private bool _notificationsInitializedPendingRequests;
+    private bool _notificationsInitializedFriendships;
+
+    private readonly Dictionary<string, Timestamp?> _conversationLastMessageAt = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _userDisplayNameCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ImageSource?> _userAvatarImageCache = new(StringComparer.Ordinal);
+    private Dictionary<string, string> _incomingPendingRequestFromUserIdToRequestId = new(StringComparer.Ordinal);
+    private HashSet<string> _friendUserIds = new(StringComparer.Ordinal);
+    private HashSet<string> _outgoingPendingToUserIds = new(StringComparer.Ordinal);
+
+    private int _unreadNotificationCount;
+    private bool _isNotificationsPopupOpen;
     private bool _suppressSettingsPersist;
 
     public ObservableCollection<object> SidebarItems { get; } = new();
@@ -208,6 +434,9 @@ public sealed class MainViewModel : ObservableObject
             if (!SetProperty(ref _selectedSidebarItem, value)) return;
 
             if (_suppressSidebarSelectionHandling) return;
+
+            // If the user clicks in the sidebar, allow auto-open again.
+            _lockConversationAgainstSidebarAutoOpen = false;
 
             if (value is FriendItemViewModel f)
             {
@@ -298,6 +527,9 @@ public sealed class MainViewModel : ObservableObject
     public ICommand TogglePinConversationCommand { get; }
     public ICommand UpdatePinnedCommand { get; }
     public ICommand UpdateNotificationsCommand { get; }
+    public ICommand OpenNotificationCommand { get; }
+    public ICommand AcceptNotificationFriendRequestCommand { get; }
+    public ICommand DeclineNotificationFriendRequestCommand { get; }
 
     public ICommand LogoutCommand { get; }
     public ICommand ToggleNotificationPopupCommand { get; }
@@ -391,6 +623,20 @@ public sealed class MainViewModel : ObservableObject
         TogglePinConversationCommand = new RelayCommand<object>(o => _ = TogglePinAsync(o), o => o != null);
         UpdatePinnedCommand = new RelayCommand<object>(o => _ = UpdatePinnedAsync(o), o => o != null);
         UpdateNotificationsCommand = new RelayCommand<object>(o => _ = UpdateNotificationsAsync(o), o => o != null);
+        OpenNotificationCommand = new RelayCommand<object>(o => Forget(OpenNotificationAsync(o as NotificationItemViewModel)), o => o is NotificationItemViewModel);
+
+        AcceptNotificationFriendRequestCommand = new RelayCommand<object>(
+            o => Forget(AcceptNotificationFriendRequestAsync(o as NotificationItemViewModel)),
+            o => o is NotificationItemViewModel n
+                 && string.Equals(n.Kind, "friend_request", StringComparison.Ordinal)
+                 && !string.IsNullOrWhiteSpace(n.RequestId)
+                 && !string.IsNullOrWhiteSpace(n.UserId));
+
+        DeclineNotificationFriendRequestCommand = new RelayCommand<object>(
+            o => Forget(DeclineNotificationFriendRequestAsync(o as NotificationItemViewModel)),
+            o => o is NotificationItemViewModel n
+                 && string.Equals(n.Kind, "friend_request", StringComparison.Ordinal)
+                 && !string.IsNullOrWhiteSpace(n.RequestId));
 
         LogoutCommand = new RelayCommand(() => Forget(LogoutAsync()));
 
@@ -409,6 +655,565 @@ public sealed class MainViewModel : ObservableObject
 
         // Best-effort: load persisted settings (theme + presence visibility).
         Forget(RefreshCurrentUserSettingsAsync());
+
+        // Best-effort: start global notifications listeners.
+        Forget(StartNotificationsAsync());
+    }
+
+    public bool IsNotificationsPopupOpen
+    {
+        get => _isNotificationsPopupOpen;
+        set
+        {
+            if (!SetProperty(ref _isNotificationsPopupOpen, value)) return;
+            if (value)
+            {
+                // Opening the popup counts as "seen"
+                MarkAllNotificationsAsRead();
+            }
+        }
+    }
+
+    private async Task OpenNotificationAsync(NotificationItemViewModel? item)
+    {
+        if (item == null) return;
+
+        // Close popup before navigating.
+        IsNotificationsPopupOpen = false;
+
+        try
+        {
+            if (item.Kind == "message_group" || item.Kind == "message_user")
+            {
+                if (string.IsNullOrWhiteSpace(item.ConversationId)) return;
+                await NavigateToConversationAsync(item.ConversationId, isGroup: item.Kind == "message_group");
+                return;
+            }
+
+            if (item.Kind == "friend_request" || item.Kind == "friend_accept")
+            {
+                if (string.IsNullOrWhiteSpace(item.UserId)) return;
+                await OpenOtherUserProfileAsync(item.UserId, item.Kind == "friend_request" ? item.RequestId : null);
+                return;
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private Task NavigateToConversationAsync(string conversationId, bool isGroup)
+    {
+        try
+        {
+            GoHome();
+
+            if (isGroup)
+            {
+                ShowGroups = true;
+                _lastSelectedGroupConversationId = conversationId;
+                ApplySidebarFilter();
+            }
+            else
+            {
+                string? currentUserId = _authService.CurrentUserId;
+                if (string.IsNullOrWhiteSpace(currentUserId)) return Task.CompletedTask;
+
+                // Map canonical conversation id -> friend user id
+                var friend = _allFriends.FirstOrDefault(f => !string.IsNullOrWhiteSpace(f.UserId)
+                                                            && string.Equals(GetCanonicalPairId(currentUserId, f.UserId), conversationId, StringComparison.Ordinal));
+                if (friend == null) return Task.CompletedTask;
+
+                ShowGroups = false;
+                _lastSelectedFriendUserId = friend.UserId;
+                ApplySidebarFilter();
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenOtherUserProfileAsync(string userId, string? incomingRequestIdHint)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return;
+
+        GoHome();
+        IsProfileMode = true;
+
+        // Provide a non-null selection so the profile action area can render correctly.
+        // LoadProfileAsync will run via SelectedFriendFinderUser setter.
+        SelectedFriendFinderUser = new UserSearchResultViewModel
+        {
+            UserId = userId,
+            DisplayName = "",
+            Subtitle = "",
+            AvatarText = "?",
+            IsIncomingRequestPending = !string.IsNullOrWhiteSpace(incomingRequestIdHint),
+            IncomingRequestId = incomingRequestIdHint ?? string.Empty
+        };
+
+        Forget(RefreshSelectedFriendFinderUserRelationshipAsync(userId, incomingRequestIdHint));
+    }
+
+    private async Task RefreshSelectedFriendFinderUserRelationshipAsync(string userId, string? incomingRequestIdHint)
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+            if (string.IsNullOrWhiteSpace(userId)) return;
+
+            var friendIds = new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                foreach (var f in _allFriends)
+                {
+                    if (!string.IsNullOrWhiteSpace(f?.UserId))
+                        friendIds.Add(f.UserId);
+                }
+            }
+            catch { }
+
+            HashSet<string> outgoingPendingToIds = new(StringComparer.Ordinal);
+            try
+            {
+                outgoingPendingToIds = await _friendsService.GetOutgoingPendingRequestToUserIdsAsync(currentUserId);
+            }
+            catch { }
+
+            Dictionary<string, string> incomingPendingFromToRequestId = new(StringComparer.Ordinal);
+            try
+            {
+                incomingPendingFromToRequestId = await _friendsService.GetIncomingPendingRequestFromUserIdToRequestIdAsync(currentUserId);
+            }
+            catch { }
+
+            var data = await _friendsService.GetUserAsync(userId);
+            string email = data == null ? string.Empty : TryGetString(data, "email");
+            string username = data == null ? string.Empty : TryGetString(data, "username");
+            string fullName = data == null ? string.Empty : TryGetString(data, "fullName");
+
+            string display = string.IsNullOrWhiteSpace(fullName)
+                ? (string.IsNullOrWhiteSpace(username) ? (string.IsNullOrWhiteSpace(email) ? "(Không tên)" : email) : username)
+                : fullName;
+
+            string subtitle = !string.IsNullOrWhiteSpace(username)
+                ? $"@{username}" + (!string.IsNullOrWhiteSpace(email) ? $" • {email}" : "")
+                : email;
+
+            bool isSelf = string.Equals(userId, currentUserId, StringComparison.Ordinal);
+            bool isFriend = !isSelf && friendIds.Contains(userId);
+
+            bool derivedIncoming = !isSelf && incomingPendingFromToRequestId.ContainsKey(userId);
+            bool isIncoming = !isSelf && (!string.IsNullOrWhiteSpace(incomingRequestIdHint) || derivedIncoming);
+            string requestId = !string.IsNullOrWhiteSpace(incomingRequestIdHint)
+                ? incomingRequestIdHint!
+                : (incomingPendingFromToRequestId.TryGetValue(userId, out var rid) ? rid : string.Empty);
+
+            bool isRequestPending = !isSelf
+                                    && !isFriend
+                                    && !isIncoming
+                                    && outgoingPendingToIds.Contains(userId);
+
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (SelectedFriendFinderUser == null) return;
+                if (!string.Equals(SelectedFriendFinderUser.UserId, userId, StringComparison.Ordinal)) return;
+
+                SelectedFriendFinderUser.DisplayName = display;
+                SelectedFriendFinderUser.Subtitle = subtitle;
+                SelectedFriendFinderUser.AvatarText = string.IsNullOrWhiteSpace(display) ? "?" : display.Substring(0, 1).ToUpperInvariant();
+                SelectedFriendFinderUser.IsSelf = isSelf;
+                SelectedFriendFinderUser.IsFriend = isFriend;
+                SelectedFriendFinderUser.IsIncomingRequestPending = isIncoming;
+                SelectedFriendFinderUser.IncomingRequestId = requestId;
+                SelectedFriendFinderUser.IsRequestPending = isRequestPending;
+            });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task StartNotificationsAsync()
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            // Initial baselines (no notification spam on startup)
+            await RefreshPendingRequestsNotificationsAsync(initial: true);
+            await RefreshFriendshipsNotificationsAsync(initial: true);
+            await RefreshConversationNotificationsAsync(initial: true);
+
+            _notificationsPendingRequestsListener = _friendsService.ListenToPendingRequests(currentUserId, () =>
+            {
+                Forget(RefreshPendingRequestsNotificationsAsync(initial: false));
+            });
+
+            _notificationsFriendshipsListener = _friendsService.ListenToFriendships(currentUserId, () =>
+            {
+                Forget(RefreshFriendshipsNotificationsAsync(initial: false));
+            });
+
+            _notificationsConversationListener = _messagingService.ListenToConversations(currentUserId, () =>
+            {
+                Forget(RefreshConversationNotificationsAsync(initial: false));
+            });
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    public void MarkAllNotificationsAsRead()
+    {
+        try
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var n in Notifications)
+                {
+                    n.IsUnread = false;
+                }
+            });
+        }
+        catch { }
+
+        UnreadNotificationCount = 0;
+    }
+
+    private void AddNotification(NotificationItemViewModel item)
+    {
+        try
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Notifications.Insert(0, item);
+
+                // keep list from growing forever (simple cap)
+                while (Notifications.Count > 100)
+                {
+                    Notifications.RemoveAt(Notifications.Count - 1);
+                }
+            });
+
+            if (AreNotificationsEnabled)
+            {
+                UnreadNotificationCount = Math.Max(0, UnreadNotificationCount + 1);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task<string> ResolveUserDisplayNameAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return "(Không tên)";
+        if (_userDisplayNameCache.TryGetValue(userId, out var cached) && !string.IsNullOrWhiteSpace(cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            var data = await _friendsService.GetUserAsync(userId);
+            if (data != null)
+            {
+                string display = TryGetString(data, "fullName", "username", "email");
+                if (string.IsNullOrWhiteSpace(display)) display = "(Không tên)";
+                _userDisplayNameCache[userId] = display;
+                return display;
+            }
+        }
+        catch { }
+
+        return "(Không tên)";
+    }
+
+    private async Task<ImageSource?> ResolveUserAvatarImageAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return null;
+
+        if (_userAvatarImageCache.TryGetValue(userId, out var cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            var data = await _friendsService.GetUserAsync(userId);
+            if (data != null)
+            {
+                string avatarValue = TryGetString(data, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
+                var img = TryDecodeDataUrlOrUriToImageSource(avatarValue);
+                _userAvatarImageCache[userId] = img;
+                return img;
+            }
+        }
+        catch { }
+
+        _userAvatarImageCache[userId] = null;
+        return null;
+    }
+
+    private async Task RefreshPendingRequestsNotificationsAsync(bool initial)
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            var map = await _friendsService.GetIncomingPendingRequestFromUserIdToRequestIdAsync(currentUserId);
+            map ??= new Dictionary<string, string>(StringComparer.Ordinal);
+
+            var previous = (_notificationsInitializedPendingRequests && !initial)
+                ? _incomingPendingRequestFromUserIdToRequestId
+                : new Dictionary<string, string>(StringComparer.Ordinal);
+
+            // Remove notifications for requests that no longer exist (sender cancelled / handled elsewhere).
+            foreach (var kv in previous)
+            {
+                if (map.ContainsKey(kv.Key)) continue;
+                string oldFromUserId = kv.Key;
+                string oldRequestId = kv.Value ?? string.Empty;
+
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        var toRemove = Notifications
+                            .Where(n => n.Kind == "friend_request"
+                                        && (string.Equals(n.UserId, oldFromUserId, StringComparison.Ordinal)
+                                            || (!string.IsNullOrWhiteSpace(oldRequestId)
+                                                && string.Equals(n.RequestId, oldRequestId, StringComparison.Ordinal))))
+                            .ToList();
+
+                        foreach (var n in toRemove)
+                        {
+                            Notifications.Remove(n);
+                        }
+                    });
+                }
+                catch { }
+            }
+
+            // Add notifications for new (or existing-at-startup) pending requests.
+            foreach (var kv in map)
+            {
+                if (previous.ContainsKey(kv.Key)) continue;
+
+                string fromUserId = kv.Key;
+                string requestId = kv.Value ?? string.Empty;
+
+                // Avoid duplicates if we already have a notification for this request.
+                bool alreadyExists = false;
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        alreadyExists = Notifications.Any(n => n.Kind == "friend_request"
+                            && (string.Equals(n.UserId, fromUserId, StringComparison.Ordinal)
+                                || (!string.IsNullOrWhiteSpace(requestId)
+                                    && string.Equals(n.RequestId, requestId, StringComparison.Ordinal))));
+                    });
+                }
+                catch { }
+
+                if (alreadyExists) continue;
+
+                string name = await ResolveUserDisplayNameAsync(fromUserId);
+                if (AreNotificationsEnabled)
+                {
+                    AddNotification(new NotificationItemViewModel
+                    {
+                        Kind = "friend_request",
+                        SourceId = fromUserId,
+                        UserId = fromUserId,
+                        RequestId = requestId,
+                        Title = "Lời mời kết bạn",
+                        Message = $"{name} đã gửi lời mời kết bạn.",
+                        TimestampUtc = DateTime.UtcNow,
+                        IsUnread = true
+                    });
+                }
+            }
+
+            _incomingPendingRequestFromUserIdToRequestId = new Dictionary<string, string>(map, StringComparer.Ordinal);
+            _notificationsInitializedPendingRequests = true;
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task RefreshFriendshipsNotificationsAsync(bool initial)
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            var outgoing = await _friendsService.GetOutgoingPendingRequestToUserIdsAsync(currentUserId);
+            outgoing ??= new HashSet<string>(StringComparer.Ordinal);
+
+            var friends = await _friendsService.GetFriends(currentUserId);
+            var nowFriendIds = friends
+                .Select(d => d.TryGetValue("userId", out var idObj) ? idObj?.ToString() ?? string.Empty : string.Empty)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (!_notificationsInitializedFriendships || initial)
+            {
+                _outgoingPendingToUserIds = new HashSet<string>(outgoing, StringComparer.Ordinal);
+                _friendUserIds = new HashSet<string>(nowFriendIds, StringComparer.Ordinal);
+                _notificationsInitializedFriendships = true;
+                return;
+            }
+
+            var newFriends = nowFriendIds.Where(id => !_friendUserIds.Contains(id)).ToList();
+            foreach (var id in newFriends)
+            {
+                string name = await ResolveUserDisplayNameAsync(id);
+                string msg = _outgoingPendingToUserIds.Contains(id)
+                    ? $"{name} đã chấp nhận lời mời kết bạn."
+                    : $"Bạn và {name} đã trở thành bạn bè.";
+
+                if (AreNotificationsEnabled)
+                {
+                    AddNotification(new NotificationItemViewModel
+                    {
+                        Kind = "friend_accept",
+                        SourceId = id,
+                        UserId = id,
+                        Title = "Kết bạn",
+                        Message = msg,
+                        TimestampUtc = DateTime.UtcNow,
+                        IsUnread = true
+                    });
+                }
+            }
+
+            _outgoingPendingToUserIds = new HashSet<string>(outgoing, StringComparer.Ordinal);
+            _friendUserIds = new HashSet<string>(nowFriendIds, StringComparer.Ordinal);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task RefreshConversationNotificationsAsync(bool initial)
+    {
+        try
+        {
+            string? currentUserId = _authService.CurrentUserId;
+            if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+            var conversations = await _messagingService.GetConversations(currentUserId);
+            conversations ??= new List<Dictionary<string, object>>();
+
+            if (!_notificationsInitializedConversations || initial)
+            {
+                _conversationLastMessageAt.Clear();
+                foreach (var d in conversations)
+                {
+                    string cid = d.TryGetValue("conversationId", out var cidObj) ? cidObj?.ToString() ?? string.Empty : string.Empty;
+                    if (string.IsNullOrWhiteSpace(cid)) continue;
+                    Timestamp? ts = null;
+                    if (d.TryGetValue("lastMessageAt", out var tsObj) && tsObj is Timestamp t)
+                    {
+                        ts = t;
+                    }
+                    _conversationLastMessageAt[cid] = ts;
+                }
+                _notificationsInitializedConversations = true;
+                return;
+            }
+
+            foreach (var d in conversations)
+            {
+                string cid = d.TryGetValue("conversationId", out var cidObj) ? cidObj?.ToString() ?? string.Empty : string.Empty;
+                if (string.IsNullOrWhiteSpace(cid)) continue;
+
+                Timestamp? newTs = null;
+                if (d.TryGetValue("lastMessageAt", out var tsObj) && tsObj is Timestamp nts)
+                {
+                    newTs = nts;
+                }
+                _conversationLastMessageAt.TryGetValue(cid, out var oldTs);
+
+                _conversationLastMessageAt[cid] = newTs;
+
+                if (newTs == null) continue;
+                if (oldTs != null && newTs.Value.CompareTo(oldTs.Value) <= 0) continue;
+
+                bool muted = d.TryGetValue("userMuted", out var m) && m is bool mb && mb;
+                if (muted) continue;
+
+                if (SelectedConversation != null && string.Equals(SelectedConversation.ConversationId, cid, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                int unread = 0;
+                try
+                {
+                    unread = await _messagingService.GetUnreadCountForConversation(cid, currentUserId);
+                }
+                catch { }
+
+                if (unread <= 0) continue;
+
+                string lastMessage = d.TryGetValue("lastMessage", out var lm) ? lm?.ToString() ?? string.Empty : string.Empty;
+                if (string.IsNullOrWhiteSpace(lastMessage)) lastMessage = "Tin nhắn mới";
+
+                bool isGroup = d.TryGetValue("isGroup", out var isg) && isg is bool b && b;
+                string title;
+                if (isGroup)
+                {
+                    title = d.TryGetValue("groupName", out var gn) ? gn?.ToString() ?? "Nhóm chat" : "Nhóm chat";
+                }
+                else
+                {
+                    title = d.TryGetValue("otherUserName", out var on) ? on?.ToString() ?? string.Empty : string.Empty;
+                    if (string.IsNullOrWhiteSpace(title))
+                    {
+                        title = d.TryGetValue("otherUsername", out var ou) ? ou?.ToString() ?? string.Empty : string.Empty;
+                    }
+                    if (string.IsNullOrWhiteSpace(title)) title = "Tin nhắn";
+                }
+
+                if (AreNotificationsEnabled)
+                {
+                    AddNotification(new NotificationItemViewModel
+                    {
+                        Kind = isGroup ? "message_group" : "message_user",
+                        SourceId = cid,
+                        ConversationId = cid,
+                        Title = title,
+                        Message = lastMessage,
+                        TimestampUtc = DateTime.UtcNow,
+                        IsUnread = true
+                    });
+                }
+            }
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     public bool IsDarkMode
@@ -483,11 +1288,18 @@ public sealed class MainViewModel : ObservableObject
                 showActivity = b;
             }
 
+            bool notificationsEnabled = true;
+            if (data.TryGetValue("notificationsEnabled", out var nObj) && nObj is bool nb)
+            {
+                notificationsEnabled = nb;
+            }
+
             _suppressSettingsPersist = true;
             try
             {
                 IsDarkMode = isDark;
                 IsActivityStatusEnabled = showActivity;
+                AreNotificationsEnabled = notificationsEnabled;
             }
             finally
             {
@@ -510,13 +1322,56 @@ public sealed class MainViewModel : ObservableObject
             await _friendsService.UpdateUserSettingsAsync(
                 currentUserId,
                 theme: IsDarkMode ? "dark" : "light",
-                showOnlineStatus: IsActivityStatusEnabled);
+                showOnlineStatus: IsActivityStatusEnabled,
+                notificationsEnabled: AreNotificationsEnabled);
         }
         catch
         {
             // ignore
         }
     }
+
+    public bool AreNotificationsEnabled
+    {
+        get => _areNotificationsEnabled;
+        set
+        {
+            if (!SetProperty(ref _areNotificationsEnabled, value)) return;
+            OnPropertyChanged(nameof(NotificationBellIconGlyph));
+            OnPropertyChanged(nameof(NotificationBadgeText));
+            if (!_suppressSettingsPersist) Forget(PersistCurrentUserSettingsAsync());
+
+            if (!value)
+            {
+                UnreadNotificationCount = 0;
+            }
+        }
+    }
+
+    public string NotificationBellIconGlyph => AreNotificationsEnabled ? "\uE7ED" : "\uE7EE";
+
+    public int UnreadNotificationCount
+    {
+        get => _unreadNotificationCount;
+        private set
+        {
+            if (!SetProperty(ref _unreadNotificationCount, value)) return;
+            OnPropertyChanged(nameof(NotificationBadgeText));
+        }
+    }
+
+    public string NotificationBadgeText
+    {
+        get
+        {
+            if (!AreNotificationsEnabled) return string.Empty;
+            int c = UnreadNotificationCount;
+            if (c <= 0) return string.Empty;
+            return c > 20 ? "20+" : c.ToString();
+        }
+    }
+
+    public System.Collections.ObjectModel.ObservableCollection<NotificationItemViewModel> Notifications { get; } = new();
 
     private async Task LogoutAsync()
     {
@@ -1310,6 +2165,7 @@ public sealed class MainViewModel : ObservableObject
                     string email = d.TryGetValue("email", out var em) ? em?.ToString() ?? string.Empty : string.Empty;
                     string username = d.TryGetValue("username", out var un) ? un?.ToString() ?? string.Empty : string.Empty;
                     string fullName = d.TryGetValue("fullName", out var fn) ? fn?.ToString() ?? string.Empty : string.Empty;
+                    string avatarValue = TryGetString(d, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
 
                     string display = string.IsNullOrWhiteSpace(fullName)
                         ? (string.IsNullOrWhiteSpace(username) ? (string.IsNullOrWhiteSpace(email) ? "(Không tên)" : email) : username)
@@ -1325,6 +2181,7 @@ public sealed class MainViewModel : ObservableObject
                         DisplayName = display,
                         Subtitle = subtitle,
                         AvatarText = string.IsNullOrWhiteSpace(display) ? "?" : display.Substring(0, 1).ToUpperInvariant(),
+                        AvatarImage = TryDecodeDataUrlOrUriToImageSource(avatarValue),
                         IsSelf = string.Equals(id, currentUserId, StringComparison.Ordinal),
                         IsFriend = !string.IsNullOrWhiteSpace(id) && !string.Equals(id, currentUserId, StringComparison.Ordinal) && friendIds.Contains(id),
                         IsIncomingRequestPending = !string.IsNullOrWhiteSpace(id)
@@ -1340,6 +2197,12 @@ public sealed class MainViewModel : ObservableObject
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.UserId))
                 .ToList();
+
+            foreach (var r in mapped)
+            {
+                if (r.AvatarImage != null) continue;
+                r.AvatarImage = await ResolveUserAvatarImageAsync(r.UserId);
+            }
 
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -1466,6 +2329,76 @@ public sealed class MainViewModel : ObservableObject
                 user.IncomingRequestId = string.Empty;
                 user.IsFriend = false;
                 user.IsRequestPending = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private async Task AcceptNotificationFriendRequestAsync(NotificationItemViewModel? item)
+    {
+        if (item == null) return;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (!string.Equals(item.Kind, "friend_request", StringComparison.Ordinal)) return;
+        if (string.IsNullOrWhiteSpace(item.RequestId) || string.IsNullOrWhiteSpace(item.UserId)) return;
+
+        try
+        {
+            var (success, message) = await _friendsService.AcceptFriendRequest(item.RequestId, item.UserId, currentUserId);
+            ShowToast(message, success ? "success" : "error");
+
+            if (success)
+            {
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() => Notifications.Remove(item));
+                }
+                catch { }
+
+                try { await LoadFriendsAsync(); } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast($"Lỗi: {ex.Message}", "error");
+        }
+    }
+
+    private async Task DeclineNotificationFriendRequestAsync(NotificationItemViewModel? item)
+    {
+        if (item == null) return;
+
+        string? currentUserId = _authService.CurrentUserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            ShowToast("Bạn chưa đăng nhập.", "error");
+            return;
+        }
+
+        if (!string.Equals(item.Kind, "friend_request", StringComparison.Ordinal)) return;
+        if (string.IsNullOrWhiteSpace(item.RequestId)) return;
+
+        try
+        {
+            var (success, message) = await _friendsService.DeclineFriendRequest(item.RequestId);
+            ShowToast(message, success ? "success" : "error");
+
+            if (success)
+            {
+                try
+                {
+                    Application.Current.Dispatcher.Invoke(() => Notifications.Remove(item));
+                }
+                catch { }
             }
         }
         catch (Exception ex)
@@ -1774,6 +2707,8 @@ public sealed class MainViewModel : ObservableObject
                     string id = d.TryGetValue("userId", out var uid) ? uid?.ToString() ?? string.Empty : string.Empty;
                     string fullName = d.TryGetValue("fullName", out var fn) ? fn?.ToString() ?? string.Empty : string.Empty;
                     string username = d.TryGetValue("username", out var un) ? un?.ToString() ?? string.Empty : string.Empty;
+                    string avatarValue = TryGetString(d, "avatarDataUrl", "avatar", "avatarUrl", "photoUrl");
+                    var avatarImg = TryDecodeDataUrlOrUriToImageSource(avatarValue);
                     bool isOnline = ComputeIsOnlineFromUserDoc(d);
                     string status = isOnline ? "Đang hoạt động" : "Không hoạt động";
                     string name = string.IsNullOrWhiteSpace(fullName) ? (string.IsNullOrWhiteSpace(username) ? "(Không tên)" : username) : fullName;
@@ -1783,12 +2718,20 @@ public sealed class MainViewModel : ObservableObject
                         Name = name,
                         Username = username,
                         Status = status,
-                        AvatarText = string.IsNullOrWhiteSpace(name) ? "?" : name.Substring(0, 1).ToUpperInvariant()
+                        AvatarText = string.IsNullOrWhiteSpace(name) ? "?" : name.Substring(0, 1).ToUpperInvariant(),
+                        AvatarImage = avatarImg
                     };
                 })
                 .Where(x => !string.IsNullOrWhiteSpace(x.UserId))
                 .OrderBy(x => x.Name)
                 .ToList();
+
+            // Best-effort: fetch avatars if GetFriends didn't include them.
+            foreach (var f in items)
+            {
+                if (f.AvatarImage != null) continue;
+                f.AvatarImage = await ResolveUserAvatarImageAsync(f.UserId);
+            }
 
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -1904,7 +2847,11 @@ public sealed class MainViewModel : ObservableObject
         }
 
         // If filtering changed the selection and there's no matching open conversation, open it once.
-        if (SelectedSidebarItem != null && !SidebarItemMatchesSelectedConversation(SelectedSidebarItem, previousConversation))
+        // BUT: when a chat was opened outside the sidebar (e.g. from group member actions),
+        // don't auto-switch back due to sidebar refreshes.
+        if (!_lockConversationAgainstSidebarAutoOpen
+            && SelectedSidebarItem != null
+            && !SidebarItemMatchesSelectedConversation(SelectedSidebarItem, previousConversation))
         {
             if (SelectedSidebarItem is FriendItemViewModel f)
             {
@@ -1983,6 +2930,7 @@ public sealed class MainViewModel : ObservableObject
                     string id = d.TryGetValue("conversationId", out var cid) ? cid?.ToString() ?? string.Empty : string.Empty;
                     string name = d.TryGetValue("groupName", out var gn) ? gn?.ToString() ?? "Nhóm chat" : "Nhóm chat";
                     string avatarDataUrl = d.TryGetValue("groupAvatarDataUrl", out var au) ? au?.ToString() ?? string.Empty : string.Empty;
+                    string createdBy = d.TryGetValue("createdBy", out var cb) ? cb?.ToString() ?? string.Empty : string.Empty;
 
                     bool pinned = d.TryGetValue("userPinned", out var p) && p is bool pb && pb;
                     bool muted = d.TryGetValue("userMuted", out var m) && m is bool mb && mb;
@@ -2008,6 +2956,7 @@ public sealed class MainViewModel : ObservableObject
                     {
                         ConversationId = id,
                         Name = name,
+                        CreatedByUserId = createdBy,
                         AvatarText = string.IsNullOrWhiteSpace(name) ? "G" : name.Substring(0, 1).ToUpperInvariant(),
                         AvatarImage = TryDecodeDataUrlToImageSource(string.IsNullOrWhiteSpace(avatarDataUrl) ? null : avatarDataUrl),
                         ParticipantIds = participants,
@@ -2293,7 +3242,8 @@ public sealed class MainViewModel : ObservableObject
             OtherUserId = friend.UserId,
             Title = friend.Name,
             Subtitle = string.Empty,
-            AvatarText = friend.AvatarText
+            AvatarText = friend.AvatarText,
+            AvatarImage = friend.AvatarImage
         };
 
         // Background: ensure conversation exists and revive if previously hidden.
@@ -2356,7 +3306,8 @@ public sealed class MainViewModel : ObservableObject
             AvatarText = group.AvatarText,
             AvatarImage = group.AvatarImage,
             IsGroup = true,
-            ParticipantIds = group.ParticipantIds
+            ParticipantIds = group.ParticipantIds,
+            CreatedByUserId = group.CreatedByUserId
         };
 
         if (needsSidebarRefresh)
@@ -2405,7 +3356,7 @@ public sealed class MainViewModel : ObservableObject
 
         string? targetConversationId = conversation?.ConversationId;
 
-        _ = Application.Current.Dispatcher.BeginInvoke(() =>
+        Application.Current.Dispatcher.Invoke(() =>
         {
             Messages.Clear();
             Members.Clear();
@@ -2443,20 +3394,40 @@ public sealed class MainViewModel : ObservableObject
 
             if (conversation.IsGroup && conversation.ParticipantIds.Count > 0)
             {
+                bool isAdmin = !string.IsNullOrWhiteSpace(conversation.CreatedByUserId)
+                               && string.Equals(conversation.CreatedByUserId, currentUserId, StringComparison.Ordinal);
+
                 foreach (var uid in conversation.ParticipantIds.Distinct(StringComparer.Ordinal))
                 {
                     if (string.IsNullOrWhiteSpace(uid)) continue;
 
                     if (string.Equals(uid, currentUserId, StringComparison.Ordinal))
                     {
-                        Members.Add(new MemberItemViewModel { Name = "Bạn", AvatarText = "B" });
+                        Members.Add(CreateMemberItemViewModel(
+                            userId: uid,
+                            displayName: "Bạn",
+                            avatarText: "B",
+                            avatarImage: CurrentUserAvatarImage,
+                            roleLabel: string.Equals(uid, conversation.CreatedByUserId, StringComparison.Ordinal) ? "Nhóm trưởng" : string.Empty,
+                            canKick: false));
                         continue;
                     }
 
                     var friend = _allFriends.FirstOrDefault(f => string.Equals(f.UserId, uid, StringComparison.Ordinal));
                     string name = friend?.Name ?? uid;
                     string avatarText = friend?.AvatarText ?? (string.IsNullOrWhiteSpace(name) ? "?" : name.Substring(0, 1).ToUpperInvariant());
-                    Members.Add(new MemberItemViewModel { Name = name, AvatarText = avatarText });
+
+                    bool canKick = isAdmin
+                                   && !string.Equals(uid, currentUserId, StringComparison.Ordinal)
+                                   && !string.Equals(uid, conversation.CreatedByUserId, StringComparison.Ordinal);
+
+                    Members.Add(CreateMemberItemViewModel(
+                        userId: uid,
+                        displayName: name,
+                        avatarText: avatarText,
+                        avatarImage: friend?.AvatarImage,
+                        roleLabel: string.Equals(uid, conversation.CreatedByUserId, StringComparison.Ordinal) ? "Nhóm trưởng" : string.Empty,
+                        canKick: canKick));
                 }
             }
             else
@@ -2584,6 +3555,7 @@ public sealed class MainViewModel : ObservableObject
                     IsOutgoing = outgoing,
                     Time = dt == DateTime.MinValue ? DateTime.Now : dt,
                     SenderAvatarText = outgoing ? "B" : IncomingAvatarText,
+                    SenderAvatarImage = outgoing ? CurrentUserAvatarImage : SelectedConversation?.AvatarImage,
                     IsRead = m.TryGetValue("read", out var rObj) && rObj is bool rb && rb
                 };
 

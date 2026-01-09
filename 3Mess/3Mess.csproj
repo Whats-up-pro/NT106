@@ -22,4 +22,16 @@
     <ProjectReference Include="..\MessagingApp.Core\MessagingApp.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Config\firebase-client-config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Config\smtp-config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Assets\logo.png" Condition="Exists('Assets\logo.png')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

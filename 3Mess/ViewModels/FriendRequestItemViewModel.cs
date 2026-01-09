@@ -1,4 +1,5 @@
 using ThreeMess.Infrastructure;
+using System.Windows.Media;
 
 namespace ThreeMess.ViewModels;
 
@@ -9,6 +10,7 @@ public sealed class FriendRequestItemViewModel : ObservableObject
     private string _displayName = string.Empty;
     private string _subtitle = string.Empty;
     private string _avatarText = "?";
+    private ImageSource? _avatarImage;
 
     public string RequestId
     {
@@ -38,5 +40,11 @@ public sealed class FriendRequestItemViewModel : ObservableObject
     {
         get => _avatarText;
         set => SetProperty(ref _avatarText, value);
+    }
+
+    public ImageSource? AvatarImage
+    {
+        get => _avatarImage;
+        set => SetProperty(ref _avatarImage, value);
     }
 }

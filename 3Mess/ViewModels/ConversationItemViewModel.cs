@@ -51,5 +51,7 @@ public sealed class ConversationItemViewModel : ObservableObject
 
     public string ConversationId { get; init; } = string.Empty;
     public string OtherUserId { get; init; } = string.Empty;
+
+    public string CreatedByUserId { get; init; } = string.Empty;
 }
 

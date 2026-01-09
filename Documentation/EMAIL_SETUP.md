@@ -1,10 +1,22 @@
-# 📧 Hướng Dẫn Cấu Hình Email Service
+# 📧 EMAIL_SETUP (Không còn dùng)
 
-## 📋 Tổng Quan
+Tài liệu này thuộc luồng cũ (OTP/SMTP).
 
-App hiện tại sử dụng Firebase Admin SDK để tạo **Password Reset Link**. Tuy nhiên, để **GỬI EMAIL THẬT** đến người dùng, bạn cần cấu hình thêm một trong các phương pháp sau:
+Hiện tại 3Mess dùng **Firebase Authentication gửi email reset mật khẩu trực tiếp** qua REST API `sendOobCode(PASSWORD_RESET)`.
+Vì vậy bạn **không cần cấu hình SMTP/Gmail** trong ứng dụng.
+
+Bạn chỉ cần:
+- Bật **Authentication → Email/Password**
+- (Tuỳ chọn) Tuỳ chỉnh nội dung email trong **Authentication → Templates → Password reset**
+
+Hướng dẫn chuẩn: xem `Documentation/FIREBASE_SETUP.md`.
 
 ---
+
+## (Tham khảo) Các phương án gửi email khác
+Nếu bạn muốn tự vận hành hệ thống email riêng (không khuyến nghị cho đồ án), bạn có thể cân nhắc các phương án như SendGrid/SMTP.
+
+Phần nội dung dưới đây được giữ lại để tham khảo, nhưng **không còn là yêu cầu của app hiện tại**.
 
 ## 🎯 Phương Pháp 1: Sử dụng Firebase Email Extension (Khuyến nghị)
 

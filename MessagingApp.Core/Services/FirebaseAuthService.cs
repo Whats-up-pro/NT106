@@ -3,6 +3,10 @@ using Google.Cloud.Firestore;
 using MessagingApp.Config;
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace MessagingApp.Services
@@ -14,6 +18,7 @@ namespace MessagingApp.Services
     {
         private static FirebaseAuthService? _instance;
         private static readonly object _lock = new object();
+        private static readonly HttpClient _http = new HttpClient();
         private readonly FirebaseAuth _auth;
         private readonly FirestoreDb _db;
 
@@ -53,43 +58,234 @@ namespace MessagingApp.Services
         }
 
         /// <summary>
-        /// Đăng nhập bằng email + mật khẩu (phiên bản gốc đơn giản: KHÔNG kiểm tra mật khẩu trên Admin SDK)
-        /// Lưu ý: Firebase Admin SDK không hỗ trợ xác thực mật khẩu; phiên bản này chỉ kiểm tra sự tồn tại user.
+        /// Đăng nhập bằng email + mật khẩu.
+        /// Lưu ý: Firebase Admin SDK không hỗ trợ xác thực mật khẩu. Vì vậy phải dùng Identity Toolkit REST API
+        /// (accounts:signInWithPassword) với Firebase Web API Key.
         /// </summary>
         public async Task<(bool success, string message, string? userId)> SignInWithEmailPassword(string email, string password)
         {
             try
             {
-                // Lấy thông tin user theo email
-                var userRecord = await _auth.GetUserByEmailAsync(email);
-                if (userRecord == null)
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
                 {
-                    return (false, "Không tìm thấy người dùng với email này.", null);
+                    return (false, "Vui lòng nhập email và mật khẩu.", null);
                 }
 
+                // If the project has "Email Enumeration Protection" enabled, Firebase REST may return
+                // INVALID_LOGIN_CREDENTIALS for both wrong email and wrong password.
+                // To satisfy UX requirements, we first check whether the email exists using Admin SDK.
+                // - If email does NOT exist: show generic message.
+                // - If email exists but sign-in fails: show "Mật khẩu không đúng".
+                try
+                {
+                    await _auth.GetUserByEmailAsync(email.Trim());
+                }
+                catch (FirebaseAuthException ex) when (
+                    ex.AuthErrorCode == AuthErrorCode.UserNotFound ||
+                    ex.AuthErrorCode == AuthErrorCode.EmailNotFound)
+                {
+                    return (false, "Email hoặc mật khẩu không đúng.", null);
+                }
+
+                string? apiKey = FirebaseConfig.WebApiKey;
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    return (false,
+                        "Thiếu Firebase Web API Key. Hãy đặt biến môi trường FIREBASE_WEB_API_KEY (hoặc FIREBASE_API_KEY) để đăng nhập bằng mật khẩu.",
+                        null);
+                }
+
+                // Verify email/password via Firebase Auth REST API
+                var signIn = await SignInWithPasswordRestAsync(apiKey, email.Trim(), password);
+                if (signIn == null || string.IsNullOrWhiteSpace(signIn.LocalId))
+                {
+                    return (false, "Đăng nhập thất bại.", null);
+                }
+
+                string uid = signIn.LocalId;
+
                 // Lấy document user trong Firestore
-                var userDoc = await _db.Collection("users").Document(userRecord.Uid).GetSnapshotAsync();
+                var userDoc = await _db.Collection("users").Document(uid).GetSnapshotAsync();
                 if (!userDoc.Exists)
                 {
                     return (false, "Dữ liệu người dùng không tồn tại.", null);
                 }
 
                 var userData = userDoc.ToDictionary();
-                CurrentUserId = userRecord.Uid;
+                CurrentUserId = uid;
                 CurrentUserData = userData;
 
                 // Cập nhật thời gian đăng nhập + trạng thái
-                await UpdateLastLogin(userRecord.Uid);
+                await UpdateLastLogin(uid);
 
-                return (true, "Đăng nhập thành công!", userRecord.Uid);
+                return (true, "Đăng nhập thành công!", uid);
+            }
+            catch (FirebaseAuthRestException ex)
+            {
+                // At this point we already know the email exists => treat generic credential errors as wrong password.
+                if (ex.Code == "INVALID_LOGIN_CREDENTIALS" || ex.Code == "INVALID_CREDENTIAL")
+                {
+                    return (false, "Mật khẩu không đúng.", null);
+                }
+
+                return (false, MapFirebaseAuthRestErrorToVietnamese(ex.Code), null);
             }
             catch (FirebaseAuthException ex)
             {
                 return (false, $"Lỗi xác thực: {ex.Message}", null);
             }
+            catch (HttpRequestException ex)
+            {
+                return (false, $"Không thể kết nối dịch vụ đăng nhập: {ex.Message}", null);
+            }
             catch (Exception ex)
             {
                 return (false, $"Lỗi: {ex.Message}", null);
+            }
+        }
+
+        private sealed class FirebaseAuthRestException : Exception
+        {
+            public string Code { get; }
+
+            public FirebaseAuthRestException(string code)
+                : base(code)
+            {
+                Code = code;
+            }
+        }
+
+        private sealed class SignInWithPasswordResponse
+        {
+            [JsonPropertyName("localId")]
+            public string? LocalId { get; set; }
+
+            [JsonPropertyName("idToken")]
+            public string? IdToken { get; set; }
+
+            [JsonPropertyName("refreshToken")]
+            public string? RefreshToken { get; set; }
+
+            [JsonPropertyName("expiresIn")]
+            public string? ExpiresIn { get; set; }
+        }
+
+        private static async Task<SignInWithPasswordResponse?> SignInWithPasswordRestAsync(string apiKey, string email, string password)
+        {
+            var url = $"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={Uri.EscapeDataString(apiKey)}";
+
+            var payload = new
+            {
+                email,
+                password,
+                returnSecureToken = true
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            using var response = await _http.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string code = TryExtractFirebaseAuthRestError(body) ?? response.ReasonPhrase ?? "UNKNOWN";
+                throw new FirebaseAuthRestException(code);
+            }
+
+            return JsonSerializer.Deserialize<SignInWithPasswordResponse>(body);
+        }
+
+        private static string? TryExtractFirebaseAuthRestError(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("error", out var err) &&
+                    err.TryGetProperty("message", out var msg))
+                {
+                    return msg.GetString();
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            return null;
+        }
+
+        private static string MapFirebaseAuthRestErrorToVietnamese(string error)
+        {
+            // Common Identity Toolkit error codes
+            return error switch
+            {
+                "EMAIL_NOT_FOUND" => "Email không tồn tại.",
+                "INVALID_PASSWORD" => "Mật khẩu không đúng.",
+                "INVALID_LOGIN_CREDENTIALS" => "Email hoặc mật khẩu không đúng.",
+                "INVALID_CREDENTIAL" => "Email hoặc mật khẩu không đúng.",
+                "USER_DISABLED" => "Tài khoản đã bị vô hiệu hóa.",
+                "TOO_MANY_ATTEMPTS_TRY_LATER" => "Thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.",
+                "INVALID_EMAIL" => "Email không hợp lệ.",
+                _ => $"Đăng nhập thất bại: {error}"
+            };
+        }
+
+        /// <summary>
+        /// Gửi email khôi phục mật khẩu (Firebase sẽ gửi email thật theo template trong Firebase Console).
+        /// Dùng Identity Toolkit REST API accounts:sendOobCode với Web API Key.
+        /// </summary>
+        public async Task<(bool success, string message)> SendPasswordResetEmail(string email)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(email))
+                {
+                    return (false, "Vui lòng nhập email.");
+                }
+
+                string? apiKey = FirebaseConfig.WebApiKey;
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    return (false, "Thiếu Firebase Web API Key. Vui lòng cấu hình Web API Key để gửi email khôi phục.");
+                }
+
+                var url = $"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={Uri.EscapeDataString(apiKey)}";
+                var payload = new
+                {
+                    requestType = "PASSWORD_RESET",
+                    email = email.Trim(),
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                using var response = await _http.PostAsync(url, new StringContent(json, Encoding.UTF8, "application/json"));
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var code = TryExtractFirebaseAuthRestError(body) ?? response.ReasonPhrase ?? "UNKNOWN";
+
+                    // Keep generic to avoid leaking whether the email exists.
+                    if (code == "EMAIL_NOT_FOUND")
+                    {
+                        return (true, "Nếu email tồn tại, hệ thống đã gửi email khôi phục. Vui lòng kiểm tra hộp thư (và Spam)." );
+                    }
+
+                    if (code == "INVALID_EMAIL")
+                    {
+                        return (false, "Email không hợp lệ.");
+                    }
+
+                    return (false, $"Không thể gửi email khôi phục: {code}");
+                }
+
+                return (true, "Đã gửi email khôi phục mật khẩu. Vui lòng kiểm tra hộp thư (và Spam)." );
+            }
+            catch (HttpRequestException ex)
+            {
+                return (false, $"Không thể kết nối dịch vụ gửi email: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
             }
         }
 
@@ -162,40 +358,6 @@ namespace MessagingApp.Services
             catch (Exception ex)
             {
                 return (false, $"Lỗi: {ex.Message}", null);
-            }
-        }
-
-        /// <summary>
-        /// Send password reset email
-        /// </summary>
-        public async Task<(bool success, string message)> SendPasswordResetEmail(string email)
-        {
-            try
-            {
-                // Check if user exists
-                var userRecord = await _auth.GetUserByEmailAsync(email);
-
-                if (userRecord == null)
-                {
-                    return (false, "Không tìm thấy người dùng với email này.");
-                }
-
-                // Generate password reset link
-                string resetLink = await _auth.GeneratePasswordResetLinkAsync(email);
-
-                // In production, send email here using SendGrid, SMTP, etc.
-                // For demo, we just confirm the link was generated
-                Console.WriteLine($"Password reset link: {resetLink}");
-
-                return (true, "Email khôi phục mật khẩu đã được gửi! Vui lòng kiểm tra hộp thư của bạn.");
-            }
-            catch (FirebaseAuthException ex)
-            {
-                return (false, $"Lỗi: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Lỗi: {ex.Message}");
             }
         }
 

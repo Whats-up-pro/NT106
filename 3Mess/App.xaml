@@ -11,6 +11,32 @@
                 <ResourceDictionary Source="Themes/Light.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- App logo mark (vector) used for Window.Icon and auth screens -->
+            <DrawingImage x:Key="AppMark">
+                <DrawingImage.Drawing>
+                    <DrawingGroup>
+                        <DrawingGroup.Children>
+                            <!-- Dark rounded-square background -->
+                            <GeometryDrawing Brush="#FF1F2937">
+                                <GeometryDrawing.Geometry>
+                                    <RectangleGeometry Rect="0,0,100,100" RadiusX="18" RadiusY="18" />
+                                </GeometryDrawing.Geometry>
+                            </GeometryDrawing>
+
+                            <!-- Speech bubble body -->
+                            <GeometryDrawing Brush="#FF4FD1C5">
+                                <GeometryDrawing.Geometry>
+                                    <RectangleGeometry Rect="18,18,64,54" RadiusX="14" RadiusY="14" />
+                                </GeometryDrawing.Geometry>
+                            </GeometryDrawing>
+
+                            <!-- Speech bubble tail -->
+                            <GeometryDrawing Brush="#FF4FD1C5" Geometry="M40,72 L52,62 L70,72 Z" />
+                        </DrawingGroup.Children>
+                    </DrawingGroup>
+                </DrawingImage.Drawing>
+            </DrawingImage>
+
             <!-- Existing control styles, now theme-aware -->
         <Style x:Key="WatermarkTextBox" TargetType="TextBox">
             <Setter Property="Height" Value="40" />

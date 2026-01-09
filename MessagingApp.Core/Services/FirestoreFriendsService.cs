@@ -549,9 +549,9 @@ namespace MessagingApp.Services
 
         /// <summary>
         /// Update user's client settings.
-        /// Writes (merge): theme ("light"/"dark"), showOnlineStatus (bool)
+        /// Writes (merge): theme ("light"/"dark"), showOnlineStatus (bool), notificationsEnabled (bool)
         /// </summary>
-        public async Task UpdateUserSettingsAsync(string userId, string? theme, bool? showOnlineStatus)
+        public async Task UpdateUserSettingsAsync(string userId, string? theme, bool? showOnlineStatus, bool? notificationsEnabled = null)
         {
             try
             {
@@ -560,6 +560,7 @@ namespace MessagingApp.Services
                 var updates = new Dictionary<string, object>();
                 if (!string.IsNullOrWhiteSpace(theme)) updates["theme"] = theme;
                 if (showOnlineStatus.HasValue) updates["showOnlineStatus"] = showOnlineStatus.Value;
+            if (notificationsEnabled.HasValue) updates["notificationsEnabled"] = notificationsEnabled.Value;
                 if (updates.Count == 0) return;
 
                 var docRef = _db.Collection("users").Document(userId);

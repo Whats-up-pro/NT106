@@ -4,6 +4,7 @@ using Google.Cloud.Firestore;
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace MessagingApp.Config
 {
@@ -19,7 +20,103 @@ namespace MessagingApp.Config
         /// <summary>
         /// Firebase project ID - UPDATE THIS with your Firebase project ID
         /// </summary>
-        public const string ProjectId = "nt106-messagingapp"; // TODO: Replace with actual project ID
+        public const string ProjectId = "nt106-messagingapp"; // Fallback only (prefer auto-detect)
+
+        private sealed record ClientConfig(string? WebApiKey, string? ProjectId, string? StorageBucket);
+
+        private static ClientConfig? TryLoadClientConfig()
+        {
+            const string fileName = "firebase-client-config.json";
+
+            try
+            {
+                var baseDir = AppContext.BaseDirectory;
+                var candidates = new List<string>
+                {
+                    Path.Combine(baseDir, "Config", fileName),
+                    Path.Combine(baseDir, fileName),
+                };
+
+                DirectoryInfo? dir = new DirectoryInfo(baseDir);
+                for (int i = 0; i < 8 && dir != null; i++)
+                {
+                    candidates.Add(Path.Combine(dir.FullName, "Config", fileName));
+                    candidates.Add(Path.Combine(dir.FullName, "MessagingApp", "Config", fileName));
+                    candidates.Add(Path.Combine(dir.FullName, "MessagingApp.Core", "Config", fileName));
+                    candidates.Add(Path.Combine(dir.FullName, "3Mess", "Config", fileName));
+                    dir = dir.Parent;
+                }
+
+                foreach (var path in candidates)
+                {
+                    if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                        continue;
+
+                    var json = File.ReadAllText(path);
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    static string? TryGetString(JsonElement root, string name)
+                    {
+                        if (root.TryGetProperty(name, out var prop))
+                        {
+                            var value = prop.GetString();
+                            if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
+                        }
+                        return null;
+                    }
+
+                    var webApiKey = TryGetString(root, "webApiKey") ?? TryGetString(root, "apiKey");
+                    var projectId = TryGetString(root, "projectId");
+                    var storageBucket = TryGetString(root, "storageBucket");
+                    return new ClientConfig(webApiKey, projectId, storageBucket);
+                }
+            }
+            catch
+            {
+                // ignore malformed config
+            }
+
+            return null;
+        }
+
+        private static string? TryReadProjectIdFromServiceAccountJson(string path)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                if (doc.RootElement.TryGetProperty("project_id", out var p))
+                {
+                    var v = p.GetString();
+                    if (!string.IsNullOrWhiteSpace(v)) return v.Trim();
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// Resolved Firebase project id.
+        /// Priority: client config (projectId) -> env var FIREBASE_PROJECT_ID/GOOGLE_CLOUD_PROJECT -> service account JSON -> fallback const.
+        /// </summary>
+        public static string ResolvedProjectId
+        {
+            get
+            {
+                var fromClientConfig = TryLoadClientConfig()?.ProjectId;
+                if (!string.IsNullOrWhiteSpace(fromClientConfig)) return fromClientConfig;
+
+                var env = Environment.GetEnvironmentVariable("FIREBASE_PROJECT_ID");
+                if (string.IsNullOrWhiteSpace(env)) env = Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
+                if (!string.IsNullOrWhiteSpace(env)) return env.Trim();
+
+                var fromSa = TryReadProjectIdFromServiceAccountJson(CredentialsPath);
+                if (!string.IsNullOrWhiteSpace(fromSa)) return fromSa;
+
+                return ProjectId;
+            }
+        }
 
         private static GoogleCredential LoadCredential(string path)
         {
@@ -51,7 +148,43 @@ namespace MessagingApp.Config
                 {
                     return env.Trim();
                 }
-                return ProjectId + ".appspot.com";
+
+                var fromClientConfig = TryLoadClientConfig()?.StorageBucket;
+                if (!string.IsNullOrWhiteSpace(fromClientConfig))
+                {
+                    return fromClientConfig;
+                }
+
+                return ResolvedProjectId + ".appspot.com";
+            }
+        }
+
+        /// <summary>
+        /// Firebase Web API Key (used for client-side email/password sign-in via Identity Toolkit REST API).
+        /// Set via env var FIREBASE_WEB_API_KEY (or FIREBASE_API_KEY).
+        /// </summary>
+        public static string? WebApiKey
+        {
+            get
+            {
+                // 1) Prefer a local config file shipped with the app
+                //    so end users don't need to set environment variables per machine.
+                var fromClientConfig = TryLoadClientConfig()?.WebApiKey;
+                if (!string.IsNullOrWhiteSpace(fromClientConfig)) return fromClientConfig;
+
+                // 2) Fallback to environment variables (useful for dev/test)
+                string? key = Environment.GetEnvironmentVariable("FIREBASE_WEB_API_KEY");
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    key = Environment.GetEnvironmentVariable("FIREBASE_API_KEY");
+                }
+
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    return null;
+                }
+
+                return key.Trim();
             }
         }
 
@@ -163,7 +296,7 @@ namespace MessagingApp.Config
                     _firebaseApp = FirebaseApp.Create(new AppOptions
                     {
                         Credential = LoadCredential(CredentialsPath),
-                        ProjectId = ProjectId
+                        ProjectId = ResolvedProjectId
                     });
 
                     Console.WriteLine("Firebase initialized successfully.");
@@ -197,7 +330,7 @@ namespace MessagingApp.Config
                         }
 
                         Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", CredentialsPath);
-                        _firestoreDb = FirestoreDb.Create(ProjectId);
+                        _firestoreDb = FirestoreDb.Create(ResolvedProjectId);
                         Console.WriteLine("Firestore database initialized.");
                     }
                     catch (Exception ex)

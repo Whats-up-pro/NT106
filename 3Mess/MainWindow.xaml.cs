@@ -99,6 +99,7 @@ public partial class MainWindow : Window
         try { SettingsToggle.IsChecked = false; } catch { }
     }
 
+
     private void UpdateEmptyState()
     {
         if (DataContext is not MainViewModel vm) return;
@@ -127,6 +128,17 @@ public partial class MainWindow : Window
             vm.ToggleFriendFinderModeCommand.Execute(null);
         }
     }
+
+    private void MemberMore_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe) return;
+        if (fe.ContextMenu == null) return;
+
+        fe.ContextMenu.PlacementTarget = fe;
+        fe.ContextMenu.IsOpen = true;
+        e.Handled = true;
+    }
+
 
     private static double Clamp(double v, double min, double max)
     {

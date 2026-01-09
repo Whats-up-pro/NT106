@@ -1,0 +1,7 @@
+{
+  "smtpHost": "smtp.gmail.com",
+  "smtpPort": 587,
+  "fromName": "3Mess",
+  "fromEmail": "YOUR_GMAIL@gmail.com",
+  "appPassword": "YOUR_GMAIL_APP_PASSWORD_16_CHARS"
+}

@@ -9,12 +9,14 @@ public sealed class GroupChatItemViewModel : ObservableObject
 {
     private string _conversationId = string.Empty;
     private string _name = string.Empty;
+    private string _createdByUserId = string.Empty;
     private string _avatarText = "G";
     private ImageSource? _avatarImage;
     private bool _isPinned;
     private bool _notificationsEnabled = true;
     private bool _isHidden;
     private DateTime? _lastActivityUtc;
+    private List<string> _participantIds = new();
 
     public string ConversationId
     {
@@ -26,6 +28,12 @@ public sealed class GroupChatItemViewModel : ObservableObject
     {
         get => _name;
         set => SetProperty(ref _name, value);
+    }
+
+    public string CreatedByUserId
+    {
+        get => _createdByUserId;
+        set => SetProperty(ref _createdByUserId, value);
     }
 
     public string AvatarText
@@ -65,5 +73,9 @@ public sealed class GroupChatItemViewModel : ObservableObject
         set => SetProperty(ref _lastActivityUtc, value);
     }
 
-    public List<string> ParticipantIds { get; init; } = new();
+    public List<string> ParticipantIds
+    {
+        get => _participantIds;
+        set => SetProperty(ref _participantIds, value ?? new List<string>());
+    }
 }

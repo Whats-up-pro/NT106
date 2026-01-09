@@ -21,6 +21,7 @@ Hiện tại solution chính gồm:
 - .NET 8 (`net8.0-windows`)
 - WPF + MVVM (Binding, ICommand, ObservableObject)
 - Firebase Admin SDK + Google Cloud Firestore
+- Firebase Auth REST API (Identity Toolkit) cho đăng nhập email/password + gửi email reset mật khẩu
 
 ## 📋 Yêu cầu
 - Windows 10+ / Windows 11
@@ -28,6 +29,7 @@ Hiện tại solution chính gồm:
 - Firebase project có bật:
 	- Authentication (Email/Password)
 	- Cloud Firestore
+	- Storage (nếu dùng gửi file)
 
 ## 🚀 Cài đặt & chạy
 
@@ -55,10 +57,26 @@ set FIREBASE_CREDENTIALS=C:\path\to\firebase-credentials.json
 ```
 
 **Cách B: đặt file vào repo**
-- Copy JSON vào `MessagingApp.Core/Config/firebase-credentials.json` (file này nên nằm trong `.gitignore`, tuyệt đối không commit).
+- Copy JSON vào `3Mess/Config/firebase-credentials.json` hoặc `MessagingApp.Core/Config/firebase-credentials.json` (file này đã được `.gitignore`, tuyệt đối không commit).
 
-Ngoài ra, nếu cần đổi Firebase ProjectId:
-- Sửa hằng `ProjectId` trong `MessagingApp.Core/Config/FirebaseConfig.cs`
+Ghi chú:
+- Project ID thường được auto-detect từ service account JSON (`project_id`), nên không cần sửa code.
+- Nếu muốn override thủ công: set env var `FIREBASE_PROJECT_ID`.
+
+### 3) Cấu hình Firebase Web API Key (để đăng nhập + quên mật khẩu)
+App đăng nhập email/password qua Firebase Auth REST API nên cần **Web API Key**.
+
+- Điền vào file `3Mess/Config/firebase-client-config.json` (file này được copy ra output khi build).
+
+Ví dụ:
+```json
+{
+	"webApiKey": "YOUR_FIREBASE_WEB_API_KEY",
+	"projectId": "your-project-id" 
+}
+```
+
+> `projectId` là tùy chọn (service account thường đã đủ). Nếu bạn dùng Storage và bucket không phải mặc định, bạn có thể set env var `FIREBASE_STORAGE_BUCKET`.
 
 ### 3) Build & run
 ```powershell
@@ -78,6 +96,7 @@ MessagingApp/          # Legacy WinForms (không còn là app chính)
 
 ## 🔒 Lưu ý bảo mật
 - Không commit service account key (`firebase-credentials.json`) lên Git.
+- Web API Key không phải secret tuyệt đối, nhưng cũng không nên hardcode bừa bãi khi public repo.
 - Nếu share repo cho người khác, chỉ share hướng dẫn setup, không share file JSON.
 
 ## 📝 License

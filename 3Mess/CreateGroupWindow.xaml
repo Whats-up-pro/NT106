@@ -6,7 +6,7 @@
         mc:Ignorable="d"
         Title="Tạo nhóm" Height="560" Width="560"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner">
+    WindowStartupLocation="CenterOwner" Icon="{DynamicResource AppMark}">
 
     <Grid Background="#FFF5F6F8" Margin="12">
         <Border CornerRadius="16" Background="#FFF3F4F6" Padding="12">
@@ -118,7 +118,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                            <Border Width="40" Height="40" CornerRadius="20" ClipToBounds="True" Background="#FFE5E7EB" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
@@ -183,7 +183,7 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                            <Border Width="40" Height="40" CornerRadius="20" ClipToBounds="True" Background="#FFE5E7EB" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>

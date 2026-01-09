@@ -6,7 +6,7 @@
         mc:Ignorable="d"
         Title="Kết bạn" Height="420" Width="520"
         ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner">
+    WindowStartupLocation="CenterOwner" Icon="{DynamicResource AppMark}">
 
     <Grid Background="#FFF5F6F8" Margin="12">
         <Border CornerRadius="16" Background="#FFF3F4F6" Padding="12">
@@ -87,10 +87,39 @@
                                                         <ColumnDefinition Width="*" />
                                                     </Grid.ColumnDefinitions>
 
-                                                    <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                                    <Grid Width="40" Height="40" VerticalAlignment="Center">
+                                                        <Ellipse Fill="#FFE5E7EB" />
+
+                                                        <Ellipse>
+                                                            <Ellipse.Fill>
+                                                                <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                                            </Ellipse.Fill>
+                                                            <Ellipse.Style>
+                                                                <Style TargetType="Ellipse">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Ellipse.Style>
+                                                        </Ellipse>
+
                                                         <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Border>
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Grid>
 
                                                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />
@@ -187,10 +216,39 @@
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
 
-                                                    <Border Width="40" Height="40" CornerRadius="20" Background="#FFE5E7EB" VerticalAlignment="Center">
+                                                    <Grid Width="40" Height="40" VerticalAlignment="Center">
+                                                        <Ellipse Fill="#FFE5E7EB" />
+
+                                                        <Ellipse>
+                                                            <Ellipse.Fill>
+                                                                <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                                            </Ellipse.Fill>
+                                                            <Ellipse.Style>
+                                                                <Style TargetType="Ellipse">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Ellipse.Style>
+                                                        </Ellipse>
+
                                                         <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="#FF111827"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Border>
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Grid>
 
                                                     <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="#FF111827" TextTrimming="CharacterEllipsis" />

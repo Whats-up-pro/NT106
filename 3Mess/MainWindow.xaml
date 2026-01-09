@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         Title="MessagingApp" Height="720" Width="1180" MinHeight="640" MinWidth="1050"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource BackgroundBrush}">
+    Background="{DynamicResource BackgroundBrush}" Icon="{DynamicResource AppMark}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
@@ -212,29 +212,56 @@
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
 
-                <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center">
-                    <Grid FlowDirection="LeftToRight">
-                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Grid Width="40" Height="40" VerticalAlignment="Center" FlowDirection="LeftToRight">
+                    <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
 
-                        <!-- Presence dot (bottom-right) -->
-                        <Ellipse Width="12" Height="12"
-                                 HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                 Margin="0,0,1,1"
-                                 Stroke="{DynamicResource SurfaceBrush}" StrokeThickness="2">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Status}" Value="Đang hoạt động">
-                                            <Setter Property="Fill" Value="#FF10B981" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                    </Grid>
-                </Border>
+                    <Ellipse>
+                        <Ellipse.Fill>
+                            <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                        </Ellipse.Fill>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
+                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!-- Presence dot (bottom-right) -->
+                    <Ellipse Width="12" Height="12"
+                             HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                             Margin="0,0,1,1"
+                             Stroke="{DynamicResource SurfaceBrush}" StrokeThickness="2">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="{DynamicResource TextMutedBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Đang hoạt động">
+                                        <Setter Property="Fill" Value="#FF10B981" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                </Grid>
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                     <DockPanel LastChildFill="True">
@@ -321,35 +348,39 @@
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
 
-                <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center">
-                    <Grid>
-                        <Image Source="{Binding AvatarImage}" Stretch="UniformToFill">
-                            <Image.Style>
-                                <Style TargetType="Image">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Image.Style>
-                        </Image>
-                        <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-                </Border>
+                <Grid Width="40" Height="40" VerticalAlignment="Center">
+                    <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
+
+                    <Ellipse>
+                        <Ellipse.Fill>
+                            <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                        </Ellipse.Fill>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
+                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
 
                 <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                     <DockPanel LastChildFill="True">
@@ -435,12 +466,68 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="28" />
                 </Grid.ColumnDefinitions>
-                <Border Width="32" Height="32" CornerRadius="16" Background="{DynamicResource PillHeaderBrush}" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextBrush}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{DynamicResource TextPrimaryBrush}" />
-                <Button Grid.Column="2" Width="28" Height="28" Margin="0" Background="Transparent" BorderThickness="0" Cursor="Hand">
+
+                <Grid Width="32" Height="32" VerticalAlignment="Center" FlowDirection="LeftToRight">
+                    <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
+
+                    <Ellipse>
+                        <Ellipse.Fill>
+                            <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                        </Ellipse.Fill>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
+                    <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock Text="{Binding RoleLabel}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RoleLabel}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+
+                <Button Grid.Column="2" Width="28" Height="28" Margin="0" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                        Click="MemberMore_Click">
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Xem trang cá nhân" Command="{Binding ViewProfileCommand}" />
+                            <MenuItem Header="Nhắn tin" Command="{Binding MessageCommand}" />
+                            <Separator />
+                            <MenuItem Header="Kick khỏi nhóm" Command="{Binding KickCommand}"
+                                      Visibility="{Binding CanKick, Converter={StaticResource BoolToVis}}" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
                     <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE712;" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" />
                 </Button>
             </Grid>
@@ -454,10 +541,39 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Border x:Name="LeftAvatar" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Bottom" Margin="0,0,8,0">
+                <Grid x:Name="LeftAvatar" Width="28" Height="28" Background="Transparent" VerticalAlignment="Bottom" Margin="0,0,8,0">
+                    <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
+
+                    <Ellipse>
+                        <Ellipse.Fill>
+                            <ImageBrush ImageSource="{Binding SenderAvatarImage}" Stretch="UniformToFill" />
+                        </Ellipse.Fill>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SenderAvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
                     <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                </Border>
+                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SenderAvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
 
                 <StackPanel x:Name="BubbleRow" Grid.Column="1" Orientation="Horizontal" Background="Transparent">
                     <!-- Outgoing: action button on the LEFT of bubble -->
@@ -550,10 +666,39 @@
                     </Button>
                 </StackPanel>
 
-                <Border x:Name="RightAvatar" Grid.Column="2" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Bottom" Margin="8,0,0,0" Visibility="Collapsed">
+                <Grid x:Name="RightAvatar" Grid.Column="2" Width="28" Height="28" Background="Transparent" VerticalAlignment="Bottom" Margin="8,0,0,0" Visibility="Collapsed">
+                    <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
+
+                    <Ellipse>
+                        <Ellipse.Fill>
+                            <ImageBrush ImageSource="{Binding SenderAvatarImage}" Stretch="UniformToFill" />
+                        </Ellipse.Fill>
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SenderAvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+
                     <TextBlock Text="{Binding SenderAvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                </Border>
+                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SenderAvatarImage}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </Grid>
 
             <DataTemplate.Triggers>
@@ -773,7 +918,7 @@
                         </Border>
 
                         <StackPanel Grid.Row="2" Margin="0,12,0,0">
-                            <TextBlock Text="{Binding FriendFinderStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="2,0,0,8" />
+                            <TextBlock Text="{Binding FriendFinderStatusText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" Margin="2,0,0,8" />
 
                             <ListBox ItemsSource="{Binding FriendFinderResults}"
                                      SelectedItem="{Binding SelectedFriendFinderUser}"
@@ -789,14 +934,43 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center">
+                                            <Grid Width="40" Height="40" VerticalAlignment="Center">
+                                                <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
+
+                                                <Ellipse>
+                                                    <Ellipse.Fill>
+                                                        <ImageBrush ImageSource="{Binding AvatarImage}" Stretch="UniformToFill" />
+                                                    </Ellipse.Fill>
+                                                    <Ellipse.Style>
+                                                        <Style TargetType="Ellipse">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Ellipse.Style>
+                                                </Ellipse>
+
                                                 <TextBlock Text="{Binding AvatarText}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding AvatarImage}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
 
                                             <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
                                             <Grid Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
@@ -828,10 +1002,10 @@
                                                             <Setter Property="Visibility" Value="Visible" />
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsRequestPending}" Value="True">
-                                                                    <Setter Property="Background" Value="#FFF3F4F6" />
-                                                                    <Setter Property="Foreground" Value="#FF6B7280" />
+                                                                    <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                                     <Setter Property="BorderThickness" Value="1" />
-                                                                    <Setter Property="BorderBrush" Value="#FFE5E7EB" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding IsFriend}" Value="True">
                                                                     <Setter Property="Background" Value="#FF111827" />
@@ -977,36 +1151,40 @@
                             <ColumnDefinition Width="56" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="18" Background="{DynamicResource SurfaceAltBrush}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="6,0,0,0">
-                            <Grid>
-                                <Image Source="{Binding SelectedConversation.AvatarImage}" Stretch="UniformToFill">
-                                    <Image.Style>
-                                        <Style TargetType="Image">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding SelectedConversation.AvatarImage}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Image.Style>
-                                </Image>
-                                <TextBlock Text="{Binding SelectedConversation.AvatarText, FallbackValue=?}"
-                                           FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding SelectedConversation.AvatarImage}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </Border>
+                        <Grid Grid.Column="0" Width="36" Height="36" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="6,0,0,0">
+                            <Ellipse Fill="{DynamicResource SurfaceAltBrush}" />
+
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <ImageBrush ImageSource="{Binding SelectedConversation.AvatarImage}" Stretch="UniformToFill" />
+                                </Ellipse.Fill>
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedConversation.AvatarImage}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+
+                            <TextBlock Text="{Binding SelectedConversation.AvatarText, FallbackValue=?}"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedConversation.AvatarImage}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
 
                         <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="{Binding SelectedConversation.Title, FallbackValue=Tin nhắn}"
@@ -1411,7 +1589,7 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding SelectedFriendFinderUser.IsRequestPending}" Value="True">
                                                                 <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
                                                                 <Setter Property="BorderThickness" Value="1" />
                                                                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                                                             </DataTrigger>
@@ -1473,7 +1651,7 @@
                                                         CommandParameter="{Binding SelectedFriendFinderUser}">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" CornerRadius="18">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="4">
                                                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                             </Border>
                                                         </ControlTemplate>
@@ -1490,7 +1668,7 @@
                                                             <Border Background="{TemplateBinding Background}"
                                                                     BorderBrush="{TemplateBinding BorderBrush}"
                                                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                                                    CornerRadius="18">
+                                                                    CornerRadius="4">
                                                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                             </Border>
                                                         </ControlTemplate>
@@ -1596,9 +1774,127 @@
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Trang chủ" Command="{Binding GoHomeCommand}">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
-                        <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7ED;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        </Button>
+                        <Grid Margin="0,0,8,0">
+                            <ToggleButton x:Name="NotificationsToggle" Style="{StaticResource RightSidebarIconToggleButton}" ToolTip="Thông báo"
+                                          IsChecked="{Binding IsNotificationsPopupOpen, Mode=TwoWay}">
+                                <Grid>
+                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="{Binding NotificationBellIconGlyph}" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                                    <!-- Badge -->
+                                    <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="9"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0"
+                                            Padding="5,1" BorderThickness="0">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding NotificationBadgeText}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding NotificationBadgeText}" Foreground="White" FontSize="10" FontWeight="SemiBold" />
+                                    </Border>
+                                </Grid>
+                            </ToggleButton>
+
+                            <Popup x:Name="NotificationsPopup" Placement="Bottom" PlacementTarget="{Binding ElementName=NotificationsToggle}"
+                                IsOpen="{Binding IsNotificationsPopupOpen, Mode=TwoWay}"
+                                StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                        CornerRadius="12" Padding="12" Width="320">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Thông báo" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                            <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
+                                                          IsChecked="{Binding AreNotificationsEnabled, Mode=TwoWay}" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,0,0,10" />
+
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="360">
+                                            <Grid>
+                                                <ItemsControl ItemsSource="{Binding Notifications}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Padding="8" CornerRadius="10">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Background" Value="Transparent" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsUnread}" Value="True">
+                                                                                <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+
+                                                                <StackPanel>
+                                                                    <!-- Click area: open chat/profile depending on Kind -->
+                                                                    <Button Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Stretch" Cursor="Hand"
+                                                                            Command="{Binding DataContext.OpenNotificationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}">
+                                                                        <StackPanel>
+                                                                            <DockPanel LastChildFill="True">
+                                                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="10,1,0,0" />
+                                                                            </DockPanel>
+                                                                            <TextBlock Text="{Binding Message}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                                        </StackPanel>
+                                                                    </Button>
+
+                                                                    <!-- Inline actions for incoming friend requests -->
+                                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                                                        <StackPanel.Style>
+                                                                            <Style TargetType="StackPanel">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding Kind}" Value="friend_request">
+                                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </StackPanel.Style>
+
+                                                                        <Button Content="Từ chối" Padding="10,4" Margin="0,0,8,0" FontSize="12"
+                                                                                Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                                                                Foreground="{DynamicResource TextPrimaryBrush}" Cursor="Hand"
+                                                                                Command="{Binding DataContext.DeclineNotificationFriendRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}" />
+
+                                                                        <Button Content="Chấp nhận" Padding="10,4" FontSize="12" Style="{StaticResource PrimarySendButton}"
+                                                                                Command="{Binding DataContext.AcceptNotificationFriendRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}" />
+                                                                    </StackPanel>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
+                                                <TextBlock Text="Chưa có thông báo." Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,18,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Notifications.Count}" Value="0">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </ScrollViewer>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
                         <Grid Margin="0,0,8,0">
                             <ToggleButton x:Name="SettingsToggle" Style="{StaticResource RightSidebarIconToggleButton}" ToolTip="Cài đặt">
                                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -1951,9 +2247,14 @@
                                             <DataTemplate>
                                                 <Button Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
                                                         Click="RightSidebarImage_Click">
-                                                    <Border Height="72" Width="72" CornerRadius="12" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,8,8">
-                                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                                                    </Border>
+                                                    <Grid Height="72" Width="72" Margin="0,0,8,8">
+                                                        <Ellipse Fill="{DynamicResource InputBackgroundBrush}" Stroke="{DynamicResource BorderBrush}" StrokeThickness="1" />
+                                                        <Ellipse>
+                                                            <Ellipse.Fill>
+                                                                <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                                            </Ellipse.Fill>
+                                                        </Ellipse>
+                                                    </Grid>
                                                 </Button>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>

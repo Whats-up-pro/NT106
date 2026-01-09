@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Windows.Media;
 using ThreeMess.Infrastructure;
 
 namespace ThreeMess.ViewModels;
@@ -10,6 +11,7 @@ public sealed class FriendItemViewModel : ObservableObject
     private string _username = string.Empty;
     private string _status = "offline";
     private string _avatarText = "?";
+    private ImageSource? _avatarImage;
     private bool _isPinned;
     private bool _notificationsEnabled = true;
     private bool _isHidden;
@@ -43,6 +45,12 @@ public sealed class FriendItemViewModel : ObservableObject
     {
         get => _avatarText;
         set => SetProperty(ref _avatarText, value);
+    }
+
+    public ImageSource? AvatarImage
+    {
+        get => _avatarImage;
+        set => SetProperty(ref _avatarImage, value);
     }
 
     public bool IsPinned

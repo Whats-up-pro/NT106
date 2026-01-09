@@ -6,7 +6,7 @@
         xmlns:vm="clr-namespace:ThreeMess.ViewModels"
         mc:Ignorable="d"
     Title="Đăng nhập" Height="520" Width="420" WindowStartupLocation="CenterScreen"
-    Background="#FFF5F6F8" Opacity="0">
+    Background="#FFF5F6F8" Opacity="0" Icon="{DynamicResource AppMark}">
 
     <Window.DataContext>
         <vm:LoginViewModel />

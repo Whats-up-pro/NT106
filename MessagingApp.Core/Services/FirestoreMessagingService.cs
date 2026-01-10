@@ -737,5 +737,127 @@ namespace MessagingApp.Services
                 return (false, $"Lỗi: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Pin a message in a conversation. Max 10 pinned messages per conversation.
+        /// </summary>
+        public async Task<(bool success, string message)> PinMessageAsync(string conversationId, string messageId, string userId)
+        {
+            if (string.IsNullOrWhiteSpace(conversationId))
+                return (false, "Thiếu conversationId.");
+            if (string.IsNullOrWhiteSpace(messageId))
+                return (false, "Thiếu messageId.");
+            if (string.IsNullOrWhiteSpace(userId))
+                return (false, "Thiếu userId.");
+
+            try
+            {
+                // Get message to cache content
+                var messageRef = _db.Collection("messages").Document(messageId);
+                var messageSnap = await messageRef.GetSnapshotAsync();
+                if (!messageSnap.Exists)
+                    return (false, "Tin nhắn không tồn tại.");
+
+                var messageData = messageSnap.ToDictionary();
+                string content = messageData.TryGetValue("content", out var c) ? c?.ToString() ?? string.Empty : string.Empty;
+                string type = messageData.TryGetValue("type", out var t) ? t?.ToString() ?? "text" : "text";
+                string senderId = messageData.TryGetValue("senderId", out var s) ? s?.ToString() ?? string.Empty : string.Empty;
+
+                // Check current pinned count
+                var pinnedQuery = _db.Collection("conversations")
+                    .Document(conversationId)
+                    .Collection("pinnedMessages");
+                var pinnedSnapshot = await pinnedQuery.GetSnapshotAsync();
+                
+                if (pinnedSnapshot.Count >= 10)
+                    return (false, "Đã đạt giới hạn 10 tin nhắn ghim.");
+
+                // Pin the message
+                var pinnedRef = _db.Collection("conversations")
+                    .Document(conversationId)
+                    .Collection("pinnedMessages")
+                    .Document(messageId);
+
+                var pinnedData = new Dictionary<string, object>
+                {
+                    { "messageId", messageId },
+                    { "pinnedAt", FieldValue.ServerTimestamp },
+                    { "pinnedBy", userId },
+                    { "messageContent", content },
+                    { "messageType", type },
+                    { "senderId", senderId }
+                };
+
+                await pinnedRef.SetAsync(pinnedData);
+                return (true, "Đã ghim tin nhắn.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Unpin a message. Anyone in the conversation can unpin.
+        /// </summary>
+        public async Task<(bool success, string message)> UnpinMessageAsync(string conversationId, string messageId)
+        {
+            if (string.IsNullOrWhiteSpace(conversationId))
+                return (false, "Thiếu conversationId.");
+            if (string.IsNullOrWhiteSpace(messageId))
+                return (false, "Thiếu messageId.");
+
+            try
+            {
+                var pinnedRef = _db.Collection("conversations")
+                    .Document(conversationId)
+                    .Collection("pinnedMessages")
+                    .Document(messageId);
+
+                await pinnedRef.DeleteAsync();
+                return (true, "Đã bỏ ghim tin nhắn.");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get all pinned messages for a conversation, ordered by pinnedAt descending.
+        /// </summary>
+        public async Task<List<Dictionary<string, object>>> GetPinnedMessagesAsync(string conversationId)
+        {
+            try
+            {
+                var pinnedMessages = new List<Dictionary<string, object>>();
+                var query = _db.Collection("conversations")
+                    .Document(conversationId)
+                    .Collection("pinnedMessages");
+
+                var snapshot = await query.GetSnapshotAsync();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    var pinnedData = doc.ToDictionary();
+                    pinnedMessages.Add(pinnedData);
+                }
+
+                // Sort by pinnedAt descending (most recent first)
+                return pinnedMessages
+                    .OrderByDescending(d =>
+                    {
+                        if (d.TryGetValue("pinnedAt", out var val) && val is Timestamp ts)
+                            return ts;
+                        return Timestamp.FromDateTime(DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc));
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting pinned messages: {ex.Message}");
+                return new List<Dictionary<string, object>>();
+            }
+        }
     }
 }

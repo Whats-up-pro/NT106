@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -357,6 +357,7 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableCollection<object> SidebarItems { get; } = new();
     public ObservableCollection<MessageItemViewModel> Messages { get; } = new();
+    public ObservableCollection<MessageItemViewModel> PinnedMessages { get; } = new();
     public ObservableCollection<MemberItemViewModel> Members { get; } = new();
 
     public ObservableCollection<RightSidebarAttachmentItemViewModel> RightImages { get; } = new();
@@ -462,6 +463,10 @@ public sealed class MainViewModel : ObservableObject
             IncomingAvatarText = string.IsNullOrWhiteSpace(value?.AvatarText) ? "A" : value!.AvatarText;
             ((RelayCommand)SendMessageCommand).RaiseCanExecuteChanged();
             ((RelayCommand)StartVoiceCallCommand).RaiseCanExecuteChanged();
+            if (!string.IsNullOrWhiteSpace(value?.ConversationId))
+            {
+                Forget(LoadPinnedMessagesAsync(value.ConversationId));
+            }
             _ = SwitchConversationAsync(value);
         }
     }
@@ -536,6 +541,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand AcceptFriendRequestFromNotificationCommand { get; }
     public ICommand DeclineFriendRequestFromNotificationCommand { get; }
     public ICommand StartVoiceCallCommand { get; }
+    public ICommand PinMessageCommand { get; }
+    public ICommand UnpinMessageCommand { get; }
 
     public event Action? LogoutRequested;
 
@@ -644,6 +651,12 @@ public sealed class MainViewModel : ObservableObject
         AcceptFriendRequestFromNotificationCommand = new RelayCommand<object>(o => Forget(AcceptFriendRequestFromNotificationAsync(o as FriendRequestItemViewModel)), o => o is FriendRequestItemViewModel);
         DeclineFriendRequestFromNotificationCommand = new RelayCommand<object>(o => Forget(DeclineFriendRequestFromNotificationAsync(o as FriendRequestItemViewModel)), o => o is FriendRequestItemViewModel);
         StartVoiceCallCommand = new RelayCommand(() => Forget(StartCallAsync()), () => SelectedConversation != null);
+        PinMessageCommand = new RelayCommand<MessageItemViewModel>(
+            msg => Forget(PinMessageAsync(msg)),
+            msg => msg != null && !msg.IsPinned && SelectedConversation != null);
+        UnpinMessageCommand = new RelayCommand<MessageItemViewModel>(
+            msg => Forget(UnpinMessageAsync(msg)),
+            msg => msg != null && msg.IsPinned && SelectedConversation != null);
 
         _ = LoadFriendsAsync();
         _ = LoadGroupsAsync();
@@ -4465,5 +4478,118 @@ public sealed class MainViewModel : ObservableObject
             return null;
         }
     }
+    
+private async Task PinMessageAsync(MessageItemViewModel? msg)
+{
+    if (msg == null || string.IsNullOrWhiteSpace(msg.MessageId)) return;
+    var conv = SelectedConversation;
+    if (conv == null || string.IsNullOrWhiteSpace(conv.ConversationId)) return;
+
+    string? currentUserId = _authService.CurrentUserId;
+    if (string.IsNullOrWhiteSpace(currentUserId)) return;
+
+    try
+    {
+        var (success, message) = await _messagingService.PinMessageAsync(conv.ConversationId, msg.MessageId, currentUserId);
+        if (success)
+        {
+            msg.IsPinned = true;
+            await LoadPinnedMessagesAsync(conv.ConversationId);
+            ShowToast("Đã ghim tin nhắn.", "success");
+        }
+        else
+        {
+            ShowToast(message, "error");
+        }
+    }
+    catch (Exception ex)
+    {
+        ShowToast($"Lỗi: {ex.Message}", "error");
+    }
 }
 
+private async Task UnpinMessageAsync(MessageItemViewModel? msg)
+{
+    if (msg == null || string.IsNullOrWhiteSpace(msg.MessageId)) return;
+    var conv = SelectedConversation;
+    if (conv == null || string.IsNullOrWhiteSpace(conv.ConversationId)) return;
+
+    try
+    {
+        var (success, message) = await _messagingService.UnpinMessageAsync(conv.ConversationId, msg.MessageId);
+        if (success)
+        {
+            msg.IsPinned = false;
+            await LoadPinnedMessagesAsync(conv.ConversationId);
+            ShowToast("Đã bỏ ghim tin nhắn.", "success");
+        }
+        else
+        {
+            ShowToast(message, "error");
+        }
+    }
+    catch (Exception ex)
+    {
+        ShowToast($"Lỗi: {ex.Message}", "error");
+    }
+}
+
+private async Task LoadPinnedMessagesAsync(string conversationId)
+{
+    if (string.IsNullOrWhiteSpace(conversationId)) return;
+
+    try
+    {
+        var pinnedData = await _messagingService.GetPinnedMessagesAsync(conversationId);
+        
+        // Tạo HashSet của pinned message IDs để tra cứu nhanh
+        var pinnedIds = new HashSet<string>(
+            pinnedData.Select(d => d.TryGetValue("messageId", out var mid) ? mid?.ToString() ?? string.Empty : string.Empty)
+                      .Where(id => !string.IsNullOrWhiteSpace(id)),
+            StringComparer.Ordinal);
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            PinnedMessages.Clear();
+            
+            // Cập nhật IsPinned cho tất cả messages trong Messages collection
+            foreach (var msg in Messages)
+            {
+                msg.IsPinned = pinnedIds.Contains(msg.MessageId);
+            }
+
+            foreach (var data in pinnedData.Take(10))
+            {
+                string messageId = data.TryGetValue("messageId", out var mid) ? mid?.ToString() ?? string.Empty : string.Empty;
+                string content = data.TryGetValue("messageContent", out var c) ? c?.ToString() ?? string.Empty : string.Empty;
+                string type = data.TryGetValue("messageType", out var t) ? t?.ToString() ?? "text" : "text";
+                string senderId = data.TryGetValue("senderId", out var sid) ? sid?.ToString() ?? string.Empty : string.Empty;
+
+                var kind = type switch
+                {
+                    "image" => MessageBubbleKind.Image,
+                    "file" => MessageBubbleKind.File,
+                    "link" => MessageBubbleKind.Link,
+                    _ => MessageBubbleKind.Text
+                };
+
+                var pinnedMsg = new MessageItemViewModel
+                {
+                    MessageId = messageId,
+                    SenderId = senderId,
+                    Text = content,
+                    Kind = kind,
+                    IsPinned = true,
+                    IsOutgoing = string.Equals(senderId, _authService.CurrentUserId, StringComparison.Ordinal)
+                };
+
+                PinnedMessages.Add(pinnedMsg);
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error loading pinned messages: {ex.Message}");
+    }
+}
+}

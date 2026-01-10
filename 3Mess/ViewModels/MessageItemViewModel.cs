@@ -19,6 +19,7 @@ public sealed class MessageItemViewModel : ObservableObject
     private string? _linkText;
     private Uri? _linkUri;
     private bool _isRead;
+    private bool _isPinned;
 
     public string MessageId { get; init; } = string.Empty;
     public string SenderId { get; init; } = string.Empty;
@@ -66,6 +67,12 @@ public sealed class MessageItemViewModel : ObservableObject
             OnPropertyChanged(nameof(OutgoingStatusText));
             OnPropertyChanged(nameof(MetaText));
         }
+    }
+
+    public bool IsPinned
+    {
+        get => _isPinned;
+        set => SetProperty(ref _isPinned, value);
     }
 
     public ImageSource? Image

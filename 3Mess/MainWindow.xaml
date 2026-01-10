@@ -5,12 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ThreeMess"
         xmlns:vm="clr-namespace:ThreeMess.ViewModels"
+        xmlns:infra="clr-namespace:ThreeMess.Infrastructure"
     xmlns:models="clr-namespace:ThreeMess.Models"
         mc:Ignorable="d"
         Title="MessagingApp" Height="720" Width="1180" MinHeight="640" MinWidth="1050"
         WindowStartupLocation="CenterScreen"
     Background="{DynamicResource BackgroundBrush}" Icon="{DynamicResource AppMark}">
     <Window.Resources>
+        <infra:BindingProxy x:Key="ViewModelProxy" Data="{Binding}" />
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
         <Style x:Key="RightSidebarIconToggleButton" TargetType="ToggleButton">
@@ -647,7 +649,22 @@
                                 </TextBlock>
                             </Border>
 
-                            <TextBlock x:Name="TimeText" Text="{Binding MetaText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Right" Margin="0,4,0,0" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                                <!-- Pin icon - hiển thị khi tin nhắn đã được ghim -->
+                                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE718;" FontSize="11" Foreground="#FFFFC107" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock x:Name="TimeText" Text="{Binding MetaText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -1139,6 +1156,7 @@
                         </Grid.Style>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="64" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -1203,8 +1221,41 @@
                         <TextBlock Grid.Column="2" Text="" />
                     </Grid>
 
+                    <!-- Pinned Messages Panel -->
+                    <Border Grid.Row="1" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="10" Padding="10" Margin="6,0,6,6">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PinnedMessages.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE718;" FontSize="14" Foreground="#FFFFC107" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Tin nhắn đã ghim" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <ItemsControl ItemsSource="{Binding PinnedMessages}" Margin="0,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Padding="8,4" Margin="0,2">
+                                                <TextBlock Text="{Binding Text}" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="500" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
                     <!-- Messages -->
-                    <Border Grid.Row="1" Background="Transparent" Padding="6,8">
+                    <Border Grid.Row="2" Background="Transparent" Padding="6,8">
                         <Grid>
                             <ListBox x:Name="MessagesList" ItemsSource="{Binding Messages}" BorderThickness="0" Background="Transparent" SelectionMode="Single"
                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1216,6 +1267,36 @@
                                         <Setter Property="BorderThickness" Value="0" />
                                         <Setter Property="Focusable" Value="False" />
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="ContextMenu">
+                                            <Setter.Value>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Ghim tin nhắn" Command="{Binding Data.PinMessageCommand, Source={StaticResource ViewModelProxy}}" CommandParameter="{Binding}">
+                                                        <MenuItem.Style>
+                                                            <Style TargetType="MenuItem">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </MenuItem.Style>
+                                                    </MenuItem>
+                                                    <MenuItem Header="Bỏ ghim" Command="{Binding Data.UnpinMessageCommand, Source={StaticResource ViewModelProxy}}" CommandParameter="{Binding}">
+                                                        <MenuItem.Style>
+                                                            <Style TargetType="MenuItem">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </MenuItem.Style>
+                                                    </MenuItem>
+                                                </ContextMenu>
+                                            </Setter.Value>
+                                        </Setter>
                                     </Style>
                                 </ListBox.ItemContainerStyle>
                             </ListBox>
@@ -1228,7 +1309,7 @@
                     </Border>
 
                     <!-- Input -->
-                    <Border Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="14" Padding="8" Margin="0,10,0,0">
+                    <Border Grid.Row="3" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="14" Padding="8" Margin="0,10,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -1774,127 +1855,6 @@
                         <Button Style="{StaticResource RightSidebarIconButton}" Margin="0,0,8,0" ToolTip="Trang chủ" Command="{Binding GoHomeCommand}">
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE80F;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Button>
-                        <Grid Margin="0,0,8,0">
-                            <ToggleButton x:Name="NotificationsToggle" Style="{StaticResource RightSidebarIconToggleButton}" ToolTip="Thông báo"
-                                          IsChecked="{Binding IsNotificationsPopupOpen, Mode=TwoWay}">
-                                <Grid>
-                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="{Binding NotificationBellIconGlyph}" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-
-                                    <!-- Badge -->
-                                    <Border Background="{DynamicResource PrimaryBrush}" CornerRadius="9"
-                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0"
-                                            Padding="5,1" BorderThickness="0">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding NotificationBadgeText}" Value="">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock Text="{Binding NotificationBadgeText}" Foreground="White" FontSize="10" FontWeight="SemiBold" />
-                                    </Border>
-                                </Grid>
-                            </ToggleButton>
-
-                            <Popup x:Name="NotificationsPopup" Placement="Bottom" PlacementTarget="{Binding ElementName=NotificationsToggle}"
-                                IsOpen="{Binding IsNotificationsPopupOpen, Mode=TwoWay}"
-                                StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
-                                <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                        CornerRadius="12" Padding="12" Width="320">
-                                    <StackPanel>
-                                        <Grid Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Thông báo" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                                            <ToggleButton Grid.Column="1" Style="{StaticResource SmallSwitch}"
-                                                          IsChecked="{Binding AreNotificationsEnabled, Mode=TwoWay}" />
-                                        </Grid>
-
-                                        <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,0,0,10" />
-
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="360">
-                                            <Grid>
-                                                <ItemsControl ItemsSource="{Binding Notifications}">
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border Padding="8" CornerRadius="10">
-                                                                <Border.Style>
-                                                                    <Style TargetType="Border">
-                                                                        <Setter Property="Background" Value="Transparent" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsUnread}" Value="True">
-                                                                                <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Border.Style>
-
-                                                                <StackPanel>
-                                                                    <!-- Click area: open chat/profile depending on Kind -->
-                                                                    <Button Background="Transparent" BorderThickness="0" Padding="0" HorizontalContentAlignment="Stretch" Cursor="Hand"
-                                                                            Command="{Binding DataContext.OpenNotificationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                            CommandParameter="{Binding}">
-                                                                        <StackPanel>
-                                                                            <DockPanel LastChildFill="True">
-                                                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="10,1,0,0" />
-                                                                            </DockPanel>
-                                                                            <TextBlock Text="{Binding Message}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
-                                                                        </StackPanel>
-                                                                    </Button>
-
-                                                                    <!-- Inline actions for incoming friend requests -->
-                                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
-                                                                        <StackPanel.Style>
-                                                                            <Style TargetType="StackPanel">
-                                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding Kind}" Value="friend_request">
-                                                                                        <Setter Property="Visibility" Value="Visible" />
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </StackPanel.Style>
-
-                                                                        <Button Content="Từ chối" Padding="10,4" Margin="0,0,8,0" FontSize="12"
-                                                                                Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                                                                Foreground="{DynamicResource TextPrimaryBrush}" Cursor="Hand"
-                                                                                Command="{Binding DataContext.DeclineNotificationFriendRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                                CommandParameter="{Binding}" />
-
-                                                                        <Button Content="Chấp nhận" Padding="10,4" FontSize="12" Style="{StaticResource PrimarySendButton}"
-                                                                                Command="{Binding DataContext.AcceptNotificationFriendRequestCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                                CommandParameter="{Binding}" />
-                                                                    </StackPanel>
-                                                                </StackPanel>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-
-                                                <TextBlock Text="Chưa có thông báo." Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,18,0,0">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Notifications.Count}" Value="0">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Grid>
-                                        </ScrollViewer>
-                                    </StackPanel>
-                                </Border>
-                            </Popup>
-                        </Grid>
                         <Grid Margin="0,0,8,0">
                             <ToggleButton x:Name="SettingsToggle" Style="{StaticResource RightSidebarIconToggleButton}" ToolTip="Cài đặt">
                                 <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE713;" FontSize="20" Foreground="{DynamicResource TextPrimaryBrush}" />

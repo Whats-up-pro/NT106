@@ -80,3 +80,4 @@ Desktop.ini
 **/Config/firebase-credentials.json
 firebase-adminsdk-*.json
 *.sql
+feature_flows.md

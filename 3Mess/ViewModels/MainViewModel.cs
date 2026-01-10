@@ -3510,6 +3510,14 @@ public sealed class MainViewModel : ObservableObject
 
     private void ApplyMessages(string conversationId, List<Dictionary<string, object>> rawMessages, string currentUserId)
     {
+        var selectedConversationSnapshot = SelectedConversation;
+        bool isGroupConversation = selectedConversationSnapshot != null
+                                  && selectedConversationSnapshot.IsGroup
+                                  && string.Equals(selectedConversationSnapshot.ConversationId, conversationId, StringComparison.Ordinal);
+
+        // Snapshot friends to avoid enumerating while the list is being refreshed on UI thread.
+        var friendsSnapshot = _allFriends.ToArray();
+
         DateTime? clearedAtUtc = null;
         if (!string.IsNullOrWhiteSpace(conversationId)
             && _conversationSettings.TryGetValue(conversationId, out var s)
@@ -3561,14 +3569,49 @@ public sealed class MainViewModel : ObservableObject
                 var dt = ExtractTimestamp(m);
                 bool outgoing = senderId == currentUserId;
 
+                // Resolve sender visuals.
+                string senderName = string.Empty;
+                string senderAvatarText = outgoing ? "B" : IncomingAvatarText;
+                ImageSource? senderAvatarImage = outgoing ? CurrentUserAvatarImage : selectedConversationSnapshot?.AvatarImage;
+
+                if (isGroupConversation)
+                {
+                    if (outgoing)
+                    {
+                        senderName = "Bạn";
+                        senderAvatarImage = CurrentUserAvatarImage;
+                        senderAvatarText = "B";
+                    }
+                    else
+                    {
+                        var friend = friendsSnapshot.FirstOrDefault(f => string.Equals(f.UserId, senderId, StringComparison.Ordinal));
+                        senderName = friend?.Name ?? (_userDisplayNameCache.TryGetValue(senderId, out var dn) ? dn : senderId);
+
+                        senderAvatarImage = friend?.AvatarImage;
+                        if (senderAvatarImage == null && _userAvatarImageCache.TryGetValue(senderId, out var cachedImg))
+                        {
+                            senderAvatarImage = cachedImg;
+                        }
+
+                        senderAvatarText = friend?.AvatarText;
+                        if (string.IsNullOrWhiteSpace(senderAvatarText))
+                        {
+                            var baseText = !string.IsNullOrWhiteSpace(senderName) ? senderName : senderId;
+                            senderAvatarText = string.IsNullOrWhiteSpace(baseText) ? "?" : baseText.Substring(0, 1).ToUpperInvariant();
+                        }
+                    }
+                }
+
                 var vm = new MessageItemViewModel
                 {
                     MessageId = messageId,
                     SenderId = senderId,
+                    SenderName = senderName,
+                    IsGroupConversation = isGroupConversation,
                     IsOutgoing = outgoing,
                     Time = dt == DateTime.MinValue ? DateTime.Now : dt,
-                    SenderAvatarText = outgoing ? "B" : IncomingAvatarText,
-                    SenderAvatarImage = outgoing ? CurrentUserAvatarImage : SelectedConversation?.AvatarImage,
+                    SenderAvatarText = senderAvatarText,
+                    SenderAvatarImage = senderAvatarImage,
                     IsRead = m.TryGetValue("read", out var rObj) && rObj is bool rb && rb
                 };
 
@@ -3898,9 +3941,12 @@ public sealed class MainViewModel : ObservableObject
         {
             MessageId = tempId,
             SenderId = currentUserId,
+            SenderName = "Bạn",
+            IsGroupConversation = selected.IsGroup,
             IsOutgoing = true,
             Time = DateTime.Now,
             SenderAvatarText = "B",
+            SenderAvatarImage = CurrentUserAvatarImage,
             Kind = MessageBubbleKind.Text,
             Text = text
         };

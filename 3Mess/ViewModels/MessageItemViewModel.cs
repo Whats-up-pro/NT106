@@ -23,6 +23,8 @@ public sealed class MessageItemViewModel : ObservableObject
 
     public string MessageId { get; init; } = string.Empty;
     public string SenderId { get; init; } = string.Empty;
+    public string SenderName { get; init; } = string.Empty;
+    public bool IsGroupConversation { get; init; }
 
     public MessageBubbleKind Kind
     {

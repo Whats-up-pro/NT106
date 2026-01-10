@@ -592,19 +592,28 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
 
-                    <Border x:Name="Bubble" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                            CornerRadius="16" Padding="14,10" MaxWidth="640">
-                        <StackPanel>
-                            <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" />
-                            <Image x:Name="MessageImage"
-                                   Source="{Binding Image}"
-                                   Visibility="Collapsed"
-                                   Margin="0,0,0,6"
-                                   MaxWidth="360"
-                                   MaxHeight="240"
-                                    Stretch="Uniform"
-                                    Cursor="Hand"
-                                    MouseLeftButtonUp="MessageImage_MouseLeftButtonUp" />
+                    <StackPanel x:Name="BubbleStack">
+                        <TextBlock x:Name="SenderNameText"
+                                   Text="{Binding SenderName}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Margin="12,0,0,4"
+                                   Visibility="Collapsed" />
+
+                        <Border x:Name="Bubble" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                CornerRadius="16" Padding="14,10" MaxWidth="640">
+                            <StackPanel>
+                                <TextBlock x:Name="MessageText" Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" />
+                                <Image x:Name="MessageImage"
+                                       Source="{Binding Image}"
+                                       Visibility="Collapsed"
+                                       Margin="0,0,0,6"
+                                       MaxWidth="360"
+                                       MaxHeight="240"
+                                        Stretch="Uniform"
+                                        Cursor="Hand"
+                                        MouseLeftButtonUp="MessageImage_MouseLeftButtonUp" />
 
                             <Border x:Name="MessageFile"
                                     Visibility="Collapsed"
@@ -665,8 +674,9 @@
                                 </TextBlock>
                                 <TextBlock x:Name="TimeText" Text="{Binding MetaText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
                     <!-- Incoming: action button on the RIGHT of bubble (local hide) -->
                     <Button x:Name="RightActionButton"
@@ -735,6 +745,14 @@
                     <Setter TargetName="MessageText" Property="Foreground" Value="White" />
                     <Setter TargetName="TimeText" Property="Foreground" Value="#FFE9D5FF" />
                 </DataTrigger>
+
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsGroupConversation}" Value="True" />
+                        <Condition Binding="{Binding IsOutgoing}" Value="False" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="SenderNameText" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
 
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:MessageBubbleKind.Image}">
                     <Setter TargetName="MessageText" Property="Visibility" Value="Collapsed" />
